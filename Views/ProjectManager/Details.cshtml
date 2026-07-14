@@ -1,0 +1,307 @@
+@model FlowDesk.Models.WorkItem
+
+@{
+    ViewData["Title"] = "Talep Detayı";
+}
+
+@functions {
+    public string GetWorkflowStatusText(FlowDesk.Models.WorkflowStatus status)
+    {
+        return status switch
+        {
+            FlowDesk.Models.WorkflowStatus.Submitted => "Gönderildi",
+            FlowDesk.Models.WorkflowStatus.UnderAnalystReview => "Analiz Sürecinde",
+            FlowDesk.Models.WorkflowStatus.WaitingManagerApproval => "Yönetici Onayında",
+            FlowDesk.Models.WorkflowStatus.ReturnedToAnalyst => "Analiste İade Edildi",
+            FlowDesk.Models.WorkflowStatus.Approved => "Onaylandı",
+            FlowDesk.Models.WorkflowStatus.Assigned => "Yazılımcıya Atandı",
+            FlowDesk.Models.WorkflowStatus.InProgress => "Geliştiriliyor",
+            FlowDesk.Models.WorkflowStatus.Completed => "Tamamlandı",
+            FlowDesk.Models.WorkflowStatus.Rejected => "Reddedildi",
+            _ => status.ToString()
+        };
+    }
+
+    public string GetWorkflowStatusClass(FlowDesk.Models.WorkflowStatus status)
+    {
+        return status switch
+        {
+            FlowDesk.Models.WorkflowStatus.Submitted => "badge-status-submitted",
+            FlowDesk.Models.WorkflowStatus.UnderAnalystReview => "badge-status-review",
+            FlowDesk.Models.WorkflowStatus.WaitingManagerApproval => "badge-status-approval",
+            FlowDesk.Models.WorkflowStatus.ReturnedToAnalyst => "badge-status-review",
+            FlowDesk.Models.WorkflowStatus.Approved => "badge-status-completed",
+            FlowDesk.Models.WorkflowStatus.Assigned => "badge-status-review",
+            FlowDesk.Models.WorkflowStatus.InProgress => "badge-status-review",
+            FlowDesk.Models.WorkflowStatus.Completed => "badge-status-completed",
+            FlowDesk.Models.WorkflowStatus.Rejected => "badge-status-rejected",
+            _ => "bg-secondary text-white"
+        };
+    }
+
+    public string GetPriorityText(FlowDesk.Models.RequestPriority priority)
+    {
+        return priority switch
+        {
+            FlowDesk.Models.RequestPriority.Low => "Düşük",
+            FlowDesk.Models.RequestPriority.Normal => "Normal",
+            FlowDesk.Models.RequestPriority.High => "Yüksek",
+            FlowDesk.Models.RequestPriority.Critical => "Kritik",
+            _ => priority.ToString()
+        };
+    }
+
+    public string GetPriorityClass(FlowDesk.Models.RequestPriority priority)
+    {
+        return priority switch
+        {
+            FlowDesk.Models.RequestPriority.Low => "badge-priority-low",
+            FlowDesk.Models.RequestPriority.Normal => "badge-priority-normal",
+            FlowDesk.Models.RequestPriority.High => "badge-priority-high",
+            FlowDesk.Models.RequestPriority.Critical => "badge-priority-critical",
+            _ => "bg-secondary text-white"
+        };
+    }
+}
+
+<div class="container-fluid p-0">
+    <!-- Breadcrumbs / Top Actions bar -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold mb-1" style="color: var(--primary-navy);">Talep Detayları</h3>
+            <p class="text-muted mb-0" style="font-size: 0.9rem;">
+                <strong>@Model.RequestNumber</strong> numaralı talebin tüm detayları ve iş akışı geçmişi.
+            </p>
+        </div>
+        <a asp-controller="ProjectManager"
+           asp-action="Index"
+           class="btn btn-secondary py-2 px-3 d-flex align-items-center gap-1"
+           style="font-size: 0.9rem;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            Taleplerime Geri Dön
+        </a>
+    </div>
+
+    <!-- Details View Layout -->
+    <div class="row g-4">
+        <!-- Main details section (Left) -->
+        <div class="col-12 col-lg-8">
+            <!-- Section 1: Temel Talep Bilgileri -->
+            <div class="modern-card mb-4">
+                <div class="modern-card-header">
+                    <h5 class="modern-card-title">Temel Talep Bilgileri</h5>
+                </div>
+                <div class="p-4">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <div class="detail-item">
+                                <div class="detail-label">Talep No</div>
+                                <div class="detail-value fw-bold text-primary">@Model.RequestNumber</div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <div class="detail-item">
+                                <div class="detail-label">İlgili Departman</div>
+                                <div class="detail-value fw-semibold">@Model.Department</div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="detail-item">
+                                <div class="detail-label">Öncelik Derecesi</div>
+                                <div class="detail-value">
+                                    <span class="badge-pill-custom @GetPriorityClass(Model.Priority)">
+                                        @GetPriorityText(Model.Priority)
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="detail-item border-0">
+                                <div class="detail-label">Talep Açıklaması</div>
+                                <div class="detail-value mt-2 p-3 bg-light rounded" style="white-space: pre-wrap; font-size: 0.9rem; line-height: 1.6; border: 1px solid var(--border-color);">@Model.RequestDescription</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 2: Notlar (Analist & Yönetici) -->
+            <div class="modern-card mb-4">
+                <div class="modern-card-header">
+                    <h5 class="modern-card-title">Analist ve Yönetici Notları</h5>
+                </div>
+                <div class="p-4">
+                    <div class="row g-4">
+                        <div class="col-12 col-md-6">
+                            <div class="p-3 rounded border border-light-subtle h-100" style="background-color: #fafbfc;">
+                                <div class="detail-label text-primary mb-2">Analist Notu</div>
+                                <div class="detail-value" style="font-size: 0.9rem; line-height: 1.5;">
+                                    @if (!string.IsNullOrEmpty(Model.AnalystNote))
+                                    {
+                                        @Model.AnalystNote
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted italic">Henüz belirlenmedi</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <div class="p-3 rounded border border-light-subtle h-100" style="background-color: #fafbfc;">
+                                <div class="detail-label text-warning mb-2">Departman Yöneticisi Notu</div>
+                                <div class="detail-value" style="font-size: 0.9rem; line-height: 1.5;">
+                                    @if (!string.IsNullOrEmpty(Model.ManagerNote))
+                                    {
+                                        @Model.ManagerNote
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted italic">Henüz belirlenmedi</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar details section (Right) -->
+        <div class="col-12 col-lg-4">
+            <!-- Section 3: Süreç ve Tarih Bilgileri -->
+            <div class="modern-card mb-4">
+                <div class="modern-card-header">
+                    <h5 class="modern-card-title">Süreç ve Tarih Bilgileri</h5>
+                </div>
+                <div class="p-4">
+                    <div class="detail-item">
+                        <div class="detail-label">Workflow Durumu</div>
+                        <div class="detail-value mt-1">
+                            <span class="badge-pill-custom @GetWorkflowStatusClass(Model.WorkflowStatus)">
+                                @GetWorkflowStatusText(Model.WorkflowStatus)
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-item">
+                        <div class="detail-label">Mevcut Statü</div>
+                        <div class="detail-value">@Model.CurrentStatus</div>
+                    </div>
+
+                    <div class="detail-item">
+                        <div class="detail-label">Oluşturulma Tarihi</div>
+                        <div class="detail-value">@Model.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+                    </div>
+
+                    <div class="detail-item">
+                        <div class="detail-label">Son Güncellenme</div>
+                        <div class="detail-value">
+                            @if (Model.UpdatedAt.HasValue)
+                            {
+                                @Model.UpdatedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                            }
+                            else
+                            {
+                                <span class="text-muted">Henüz güncellenmedi</span>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="detail-item">
+                        <div class="detail-label">Onaylanma Tarihi</div>
+                        <div class="detail-value">
+                            @if (Model.ApprovedAt.HasValue)
+                            {
+                                @Model.ApprovedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                            }
+                            else
+                            {
+                                <span class="text-muted">Henüz onaylanmadı</span>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="detail-item">
+                        <div class="detail-label">Sürüm (Release) Tarihi</div>
+                        <div class="detail-value">
+                            @if (Model.ReleaseDate.HasValue)
+                            {
+                                @Model.ReleaseDate.Value.ToString("dd.MM.yyyy")
+                            }
+                            else
+                            {
+                                <span class="text-muted">Henüz belirlenmedi</span>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="detail-item border-0">
+                        <div class="detail-label">Banksoft Teslim Tarihi</div>
+                        <div class="detail-value">
+                            @if (Model.BanksoftDeliveryDate.HasValue)
+                            {
+                                @Model.BanksoftDeliveryDate.Value.ToString("dd.MM.yyyy")
+                            }
+                            else
+                            {
+                                <span class="text-muted">Henüz belirlenmedi</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 4: Atama Bilgileri -->
+            <div class="modern-card">
+                <div class="modern-card-header">
+                    <h5 class="modern-card-title">Görev Atama Bilgileri</h5>
+                </div>
+                <div class="p-4">
+                    <div class="detail-item">
+                        <div class="detail-label">Sorumlu Analist</div>
+                        <div class="detail-value">
+                            @if (Model.AnalystId.HasValue)
+                            {
+                                <span class="text-success fw-semibold">
+                                    <span class="d-inline-block rounded-circle bg-success me-1" style="width: 8px; height: 8px;"></span>
+                                    Analist Atandı
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">Henüz belirlenmedi</span>
+                            }
+                        </div>
+                    </div>
+                    
+                    <div class="detail-item border-0">
+                        <div class="detail-label">Geliştirici Yazılımcı</div>
+                        <div class="detail-value">
+                            @if (Model.DeveloperId.HasValue)
+                            {
+                                <span class="text-success fw-semibold">
+                                    <span class="d-inline-block rounded-circle bg-success me-1" style="width: 8px; height: 8px;"></span>
+                                    Yazılımcı Atandı
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">Henüz belirlenmedi</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bottom Action Back button -->
+    <div class="mt-4">
+        <a asp-controller="ProjectManager"
+           asp-action="Index"
+           class="btn btn-secondary">
+            Geri Dön
+        </a>
+    </div>
+</div>

@@ -1,0 +1,267 @@
+@model IEnumerable<FlowDesk.Models.WorkItem>
+
+@{
+    ViewData["Title"] = "Taleplerim";
+    
+    // Calculate statistics from the model
+    var totalRequests = Model.Count();
+    var analystReviewCount = Model.Count(x => x.WorkflowStatus == FlowDesk.Models.WorkflowStatus.Submitted 
+                                           || x.WorkflowStatus == FlowDesk.Models.WorkflowStatus.UnderAnalystReview
+                                           || x.WorkflowStatus == FlowDesk.Models.WorkflowStatus.ReturnedToAnalyst);
+    var managerApprovalCount = Model.Count(x => x.WorkflowStatus == FlowDesk.Models.WorkflowStatus.WaitingManagerApproval);
+    var completedCount = Model.Count(x => x.WorkflowStatus == FlowDesk.Models.WorkflowStatus.Completed);
+}
+
+@functions {
+    public string GetWorkflowStatusText(FlowDesk.Models.WorkflowStatus status)
+    {
+        return status switch
+        {
+            FlowDesk.Models.WorkflowStatus.Submitted => "Gönderildi",
+            FlowDesk.Models.WorkflowStatus.UnderAnalystReview => "Analiz Sürecinde",
+            FlowDesk.Models.WorkflowStatus.WaitingManagerApproval => "Yönetici Onayında",
+            FlowDesk.Models.WorkflowStatus.ReturnedToAnalyst => "Analiste İade Edildi",
+            FlowDesk.Models.WorkflowStatus.Approved => "Onaylandı",
+            FlowDesk.Models.WorkflowStatus.Assigned => "Yazılımcıya Atandı",
+            FlowDesk.Models.WorkflowStatus.InProgress => "Geliştiriliyor",
+            FlowDesk.Models.WorkflowStatus.Completed => "Tamamlandı",
+            FlowDesk.Models.WorkflowStatus.Rejected => "Reddedildi",
+            _ => status.ToString()
+        };
+    }
+
+    public string GetWorkflowStatusClass(FlowDesk.Models.WorkflowStatus status)
+    {
+        return status switch
+        {
+            FlowDesk.Models.WorkflowStatus.Submitted => "badge-status-submitted",
+            FlowDesk.Models.WorkflowStatus.UnderAnalystReview => "badge-status-review",
+            FlowDesk.Models.WorkflowStatus.WaitingManagerApproval => "badge-status-approval",
+            FlowDesk.Models.WorkflowStatus.ReturnedToAnalyst => "badge-status-review",
+            FlowDesk.Models.WorkflowStatus.Approved => "badge-status-completed",
+            FlowDesk.Models.WorkflowStatus.Assigned => "badge-status-review",
+            FlowDesk.Models.WorkflowStatus.InProgress => "badge-status-review",
+            FlowDesk.Models.WorkflowStatus.Completed => "badge-status-completed",
+            FlowDesk.Models.WorkflowStatus.Rejected => "badge-status-rejected",
+            _ => "bg-secondary text-white"
+        };
+    }
+
+    public string GetPriorityText(FlowDesk.Models.RequestPriority priority)
+    {
+        return priority switch
+        {
+            FlowDesk.Models.RequestPriority.Low => "Düşük",
+            FlowDesk.Models.RequestPriority.Normal => "Normal",
+            FlowDesk.Models.RequestPriority.High => "Yüksek",
+            FlowDesk.Models.RequestPriority.Critical => "Kritik",
+            _ => priority.ToString()
+        };
+    }
+
+    public string GetPriorityClass(FlowDesk.Models.RequestPriority priority)
+    {
+        return priority switch
+        {
+            FlowDesk.Models.RequestPriority.Low => "badge-priority-low",
+            FlowDesk.Models.RequestPriority.Normal => "badge-priority-normal",
+            FlowDesk.Models.RequestPriority.High => "badge-priority-high",
+            FlowDesk.Models.RequestPriority.Critical => "badge-priority-critical",
+            _ => "bg-secondary text-white"
+        };
+    }
+}
+
+<div class="container-fluid p-0">
+    <!-- Breadcrumbs / Top Actions bar -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold mb-1" style="color: var(--primary-navy);">Taleplerim</h3>
+            <p class="text-muted mb-0" style="font-size: 0.9rem;">
+                Oluşturduğunuz talepleri ve güncel durumlarını bu ekrandan takip edebilirsiniz.
+            </p>
+        </div>
+        <a asp-controller="ProjectManager"
+           asp-action="Create"
+           class="btn btn-primary d-flex align-items-center gap-2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Yeni Talep Oluştur
+        </a>
+    </div>
+
+    <!-- Alert Message -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm mb-4" role="alert" style="border-left: 4px solid var(--color-completed) !important; background-color: var(--bg-completed); color: var(--color-completed);">
+            <div class="d-flex align-items-center gap-2">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                <span>@TempData["SuccessMessage"]</span>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Kapat"></button>
+        </div>
+    }
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm mb-4" role="alert" style="border-left: 4px solid var(--color-critical) !important; background-color: var(--bg-critical); color: var(--color-critical);">
+            <div class="d-flex align-items-center gap-2">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                <span>@TempData["ErrorMessage"]</span>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Kapat"></button>
+        </div>
+    }
+
+    <!-- Stat Cards Summary Grid -->
+    <div class="row g-4 mb-4">
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="stat-card">
+                <div>
+                    <div class="stat-label">Toplam Talep</div>
+                    <div class="stat-value">@totalRequests</div>
+                </div>
+                <div class="stat-footer-text">Oluşturulan toplam iş miktarı</div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="stat-card">
+                <div>
+                    <div class="stat-label">Analiz Aşamasında</div>
+                    <div class="stat-value">@analystReviewCount</div>
+                </div>
+                <div class="stat-footer-text">Analist incelemesindeki talepler</div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="stat-card">
+                <div>
+                    <div class="stat-label">Yönetici Onayında</div>
+                    <div class="stat-value" style="color: var(--color-approval);">@managerApprovalCount</div>
+                </div>
+                <div class="stat-footer-text">Onay bekleyen talepler</div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="stat-card">
+                <div>
+                    <div class="stat-label">Tamamlanan</div>
+                    <div class="stat-value" style="color: var(--color-completed);">@completedCount</div>
+                </div>
+                <div class="stat-footer-text">Çözüme kavuşan talepler</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main List Table / Card -->
+    <div class="modern-card">
+        <div class="modern-card-header">
+            <h5 class="modern-card-title">Talepler Listesi</h5>
+        </div>
+
+        @if (!Model.Any())
+        {
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="9" y1="15" x2="15" y2="15"></line><line x1="9" y1="19" x2="15" y2="19"></line><line x1="9" y1="11" x2="11" y2="11"></line></svg>
+                </div>
+                <h5 class="empty-state-title">Kayıt Bulunamadı</h5>
+                <p class="empty-state-description">
+                    Sistemde henüz oluşturulmuş bir iş talebi kaydınız bulunmamaktadır.
+                </p>
+                <a asp-controller="ProjectManager"
+                   asp-action="Create"
+                   class="btn btn-primary d-inline-flex align-items-center gap-2">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    İlk Talebimi Oluştur
+                </a>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table modern-table align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width: 130px;">Talep No</th>
+                            <th>Talep Açıklaması</th>
+                            <th>Departman</th>
+                            <th style="width: 110px;">Öncelik</th>
+                            <th>Mevcut Statü</th>
+                            <th style="width: 180px;">Workflow</th>
+                            <th style="width: 160px;">Tarih</th>
+                            <th class="text-end" style="width: 100px;">İşlem</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model)
+                        {
+                            <tr>
+                                <td class="fw-bold" style="color: var(--primary-navy);">
+                                    @item.RequestNumber
+                                </td>
+                                <td>
+                                    @{
+                                        string description = item.RequestDescription ?? "";
+                                        if (description.Length > 70)
+                                        {
+                                            description = description.Substring(0, 70) + "...";
+                                        }
+                                    }
+                                    @description
+                                </td>
+                                <td>
+                                    <span class="text-dark fw-medium">@item.Department</span>
+                                </td>
+                                <td>
+                                    <span class="badge-pill-custom @GetPriorityClass(item.Priority)">
+                                        @GetPriorityText(item.Priority)
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="text-dark fw-medium" style="font-size: 0.85rem;">@item.CurrentStatus</span>
+                                </td>
+                                <td>
+                                    <span class="badge-pill-custom @GetWorkflowStatusClass(item.WorkflowStatus)">
+                                        <span class="d-inline-block rounded-circle me-1" style="width: 6px; height: 6px; background-color: currentColor;"></span>
+                                        @GetWorkflowStatusText(item.WorkflowStatus)
+                                    </span>
+                                </td>
+                                <td class="text-muted" style="font-size: 0.8rem;">
+                                    @item.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                                </td>
+                                <td class="text-end">
+                                    <div class="d-flex gap-2 justify-content-end flex-wrap">
+                                        <a asp-controller="ProjectManager"
+                                           asp-action="Details"
+                                           asp-route-id="@item.Id"
+                                           class="btn btn-sm btn-outline-primary py-1 px-3 d-inline-flex align-items-center gap-1">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                            Detay
+                                        </a>
+
+                                        @if (item.WorkflowStatus == FlowDesk.Models.WorkflowStatus.Submitted)
+                                        {
+                                            <a asp-controller="ProjectManager"
+                                               asp-action="Edit"
+                                               asp-route-id="@item.Id"
+                                               class="btn btn-sm btn-outline-warning py-1 px-3 d-inline-flex align-items-center gap-1">
+                                                Güncelle
+                                            </a>
+
+                                            <a asp-controller="ProjectManager"
+                                               asp-action="Delete"
+                                               asp-route-id="@item.Id"
+                                               class="btn btn-sm btn-outline-danger py-1 px-3 d-inline-flex align-items-center gap-1">
+                                                Sil
+                                            </a>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
