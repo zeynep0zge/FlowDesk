@@ -1,0 +1,60 @@
+﻿@model FlowDesk.Models.WorkItem
+
+@{
+    ViewData["Title"] = "Talebi Sil";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-7">
+            <div class="card border-danger shadow-sm">
+                <div class="card-header bg-danger text-white">
+                    <h3 class="mb-0">Talebi Sil</h3>
+                </div>
+
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        Bu talebi silmek istediğinizden emin misiniz?
+                        Bu işlem geri alınamaz.
+                    </div>
+
+                    <dl class="row">
+                        <dt class="col-sm-4">Talep No</dt>
+                        <dd class="col-sm-8">@Model.RequestNumber</dd>
+
+                        <dt class="col-sm-4">Talep</dt>
+                        <dd class="col-sm-8">
+                            @Model.RequestDescription
+                        </dd>
+
+                        <dt class="col-sm-4">Departman</dt>
+                        <dd class="col-sm-8">@Model.Department</dd>
+
+                        <dt class="col-sm-4">Öncelik</dt>
+                        <dd class="col-sm-8">@Model.Priority</dd>
+                    </dl>
+
+                    <form asp-controller="ProjectManager"
+                          asp-action="Delete"
+                          asp-route-id="@Model.Id"
+                          method="post">
+
+                        @Html.AntiForgeryToken()
+
+                        <div class="d-flex justify-content-between">
+                            <a asp-action="Index"
+                               class="btn btn-outline-secondary">
+                                Vazgeç
+                            </a>
+
+                            <button type="submit"
+                                    class="btn btn-danger">
+                                Talebi Sil
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
