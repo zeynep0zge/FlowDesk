@@ -1,0 +1,363 @@
+@model IEnumerable<FlowDesk.Models.WorkItem>
+
+@using FlowDesk.Models
+
+@{
+    ViewData["Title"] = "Analist Gelen Kutusu";
+
+    var workItems = Model?.ToList() ?? new List<WorkItem>();
+
+    int totalCount = workItems.Count;
+
+    int newRequestCount = workItems.Count(x =>
+        x.WorkflowStatus == WorkflowStatus.Submitted);
+
+    int reviewingCount = workItems.Count(x =>
+        x.WorkflowStatus == WorkflowStatus.UnderAnalystReview);
+
+    int returnedCount = ViewData["ReturnedToAnalystCount"] is int count
+        ? count
+        : 0;
+}
+
+<div class="container-fluid p-0">
+
+    <!-- Sayfa başlığı -->
+    <div class="d-flex flex-column flex-md-row
+                justify-content-between align-items-md-center
+                gap-3 mb-4">
+
+        <div>
+            <h3 class="fw-bold mb-1"
+                style="color: var(--primary-navy);">
+                Analist Gelen Kutusu
+            </h3>
+
+            <p class="text-muted mb-0"
+               style="font-size: 0.9rem;">
+                İncelenmesi, detaylandırılması ve atama yapılması
+                gereken talepleri görüntüleyebilirsiniz.
+            </p>
+        </div>
+
+        <a asp-controller="Analyst"
+           asp-action="ReturnedRequests"
+           class="btn btn-outline-secondary">
+
+            Yönetici Tarafından İade Edilenler
+
+            @if (returnedCount > 0)
+            {
+                <span class="badge bg-danger ms-1">
+                    @returnedCount
+                </span>
+            }
+        </a>
+    </div>
+
+    <!-- Bildirimler -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show"
+             role="alert">
+
+            @TempData["SuccessMessage"]
+
+            <button type="button"
+                    class="btn-close"
+                    data-bs-dismiss="alert"
+                    aria-label="Kapat">
+            </button>
+        </div>
+    }
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show"
+             role="alert">
+
+            @TempData["ErrorMessage"]
+
+            <button type="button"
+                    class="btn-close"
+                    data-bs-dismiss="alert"
+                    aria-label="Kapat">
+            </button>
+        </div>
+    }
+
+    <!-- Özet kartları -->
+    <div class="row g-3 mb-4">
+
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <p class="text-muted mb-2">
+                        Toplam Talep
+                    </p>
+
+                    <h3 class="fw-bold mb-0">
+                        @totalCount
+                    </h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <p class="text-muted mb-2">
+                        Yeni Talepler
+                    </p>
+
+                    <h3 class="fw-bold mb-0 text-primary">
+                        @newRequestCount
+                    </h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <p class="text-muted mb-2">
+                        İncelemede
+                    </p>
+
+                    <h3 class="fw-bold mb-0 text-warning">
+                        @reviewingCount
+                    </h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <p class="text-muted mb-2">
+                        İade Edilen
+                    </p>
+
+                    <h3 class="fw-bold mb-0 text-danger">
+                        @returnedCount
+                    </h3>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Talep listesi -->
+    <div class="card border-0 shadow-sm">
+
+        <div class="card-header bg-white border-bottom py-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="fw-bold mb-1">
+                        İncelenecek Talepler
+                    </h5>
+
+                    <p class="text-muted mb-0"
+                       style="font-size: 0.85rem;">
+                        Talebi açarak analiz ve atama bilgilerini
+                        düzenleyebilirsiniz.
+                    </p>
+                </div>
+
+                <span class="badge bg-light text-dark border">
+                    @totalCount kayıt
+                </span>
+            </div>
+        </div>
+
+        <div class="card-body p-0">
+
+            @if (!workItems.Any())
+            {
+                <div class="text-center py-5 px-3">
+
+                    <div class="mb-3">
+                        <svg width="54"
+                             height="54"
+                             viewBox="0 0 24 24"
+                             fill="none"
+                             stroke="currentColor"
+                             stroke-width="1.5"
+                             class="text-muted">
+
+                            <path d="M9 11l3 3L22 4"></path>
+                            <path d="M21 12v7a2 2 0 0 1-2 2H5
+                                         a2 2 0 0 1-2-2V5
+                                         a2 2 0 0 1 2-2h11">
+                            </path>
+                        </svg>
+                    </div>
+
+                    <h5 class="fw-semibold">
+                        İncelenecek talep bulunmuyor
+                    </h5>
+
+                    <p class="text-muted mb-0">
+                        Analist incelemesi bekleyen yeni bir talep
+                        geldiğinde burada görüntülenecektir.
+                    </p>
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4">Talep No</th>
+                                <th>Talep Açıklaması</th>
+                                <th>Departman</th>
+                                <th>Öncelik</th>
+                                <th>İş Akışı Durumu</th>
+                                <th>Mevcut Statü</th>
+                                <th class="text-center text-nowrap">Oluşturulma Tarihi</th>
+                                <th class="text-center pe-4">İşlem</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            @foreach (var item in workItems)
+                            {
+                                string description =
+                                    item.RequestDescription.Length > 80
+                                        ? item.RequestDescription[..80] + "..."
+                                        : item.RequestDescription;
+
+                                string priorityText = item.Priority switch
+                                {
+                                    RequestPriority.Low => "Düşük",
+                                    RequestPriority.Normal => "Normal",
+                                    RequestPriority.High => "Yüksek",
+                                    RequestPriority.Critical => "Kritik",
+                                    _ => item.Priority.ToString()
+                                };
+
+                                string priorityClass = item.Priority switch
+                                {
+                                    RequestPriority.Low =>
+                                        "bg-success-subtle text-success",
+
+                                    RequestPriority.Normal =>
+                                        "bg-primary-subtle text-primary",
+
+                                    RequestPriority.High =>
+                                        "bg-warning-subtle text-warning-emphasis",
+
+                                    RequestPriority.Critical =>
+                                        "bg-danger-subtle text-danger",
+
+                                    _ => "bg-secondary-subtle text-secondary"
+                                };
+
+                                string workflowText = item.WorkflowStatus switch
+                                {
+                                    WorkflowStatus.Submitted =>
+                                        "Yeni Talep",
+
+                                    WorkflowStatus.UnderAnalystReview =>
+                                        "Analist İncelemesinde",
+
+                                    _ => item.WorkflowStatus.ToString()
+                                };
+
+                                string workflowClass = item.WorkflowStatus switch
+                                {
+                                    WorkflowStatus.Submitted =>
+                                        "bg-info-subtle text-dark",
+
+                                    WorkflowStatus.UnderAnalystReview =>
+                                        "bg-warning-subtle text-warning-emphasis",
+
+                                    _ => "bg-secondary-subtle text-secondary"
+                                };
+
+                                <tr>
+                                    <td class="ps-4">
+                                        <span class="fw-semibold">
+                                            @item.RequestNumber
+                                        </span>
+                                    </td>
+
+                                    <td style="min-width: 260px;">
+                                        <span title="@item.RequestDescription">
+                                            @description
+                                        </span>
+                                    </td>
+
+                                    <td>
+                                        @item.Department
+                                    </td>
+
+                                    <td>
+                                        <span class="badge rounded-pill @priorityClass">
+                                            @priorityText
+                                        </span>
+                                    </td>
+
+                                    <td>
+                                        <span class="badge rounded-pill @workflowClass">
+                                            @workflowText
+                                        </span>
+                                    </td>
+
+                                    <td>
+                                        @if (string.IsNullOrWhiteSpace(item.CurrentStatus))
+                                        {
+                                            <span class="text-muted">
+                                                Belirlenmedi
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            @item.CurrentStatus
+                                        }
+                                    </td>
+
+                                    <td class="text-center text-nowrap align-middle inbox-date-cell">
+                                        @($"{item.CreatedAt.ToLocalTime():dd.MM.yyyy HH:mm}")
+                                    </td>
+
+                                    <td class="text-center pe-4 align-middle inbox-action-cell">
+                                        @if (item.WorkflowStatus == WorkflowStatus.Submitted)
+                                        {
+                                            <form asp-controller="Analyst"
+                                                  asp-action="StartReview"
+                                                  asp-route-id="@item.Id"
+                                                  method="post"
+                                                  class="d-inline-block m-0">
+                                                @Html.AntiForgeryToken()
+
+                                                <button type="submit"
+                                                        class="btn btn-sm btn-primary review-action-btn">
+                                                    İncelemeye Başla
+                                                </button>
+                                            </form>
+                                        }
+                                        else
+                                        {
+                                            <a asp-controller="Analyst"
+                                               asp-action="Review"
+                                               asp-route-id="@item.Id"
+                                               class="btn btn-sm btn-primary review-action-btn">
+                                                İncelemeye Devam Et
+                                            </a>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+
+                    </table>
+                </div>
+            }
+
+        </div>
+    </div>
+
+</div>

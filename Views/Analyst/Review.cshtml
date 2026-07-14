@@ -1,0 +1,460 @@
+@model FlowDesk.Models.WorkItem
+
+@using FlowDesk.Models
+
+@{
+    ViewData["Title"] = "Talep İncele";
+
+    string workflowText = Model.WorkflowStatus switch
+    {
+        WorkflowStatus.Submitted => "Yeni Talep",
+        WorkflowStatus.UnderAnalystReview => "Analist İncelemesinde",
+        WorkflowStatus.ReturnedToAnalyst => "Analiste İade Edildi",
+        _ => Model.WorkflowStatus.ToString()
+    };
+
+    string releaseDateValue =
+        Model.ReleaseDate?.ToString("yyyy-MM-dd") ?? string.Empty;
+
+    string banksoftDeliveryDateValue =
+        Model.BanksoftDeliveryDate?.ToString("yyyy-MM-dd") ?? string.Empty;
+
+    string[] currentStatusOptions =
+    {
+        "Analist İncelemesinde",
+        "Geliştirme Bekliyor",
+        "Geliştirme Devam Ediyor",
+        "Test Bekliyor",
+        "Sürüme Hazır"
+    };
+}
+
+<div class="container-fluid p-0">
+
+    <!-- Sayfa başlığı -->
+    <div class="d-flex flex-column flex-md-row
+                justify-content-between align-items-md-center
+                gap-3 mb-4">
+
+        <div>
+            <h3 class="fw-bold mb-1"
+                style="color: var(--primary-navy);">
+                Talep İnceleme
+            </h3>
+
+            <p class="text-muted mb-0">
+                Talep bilgilerini inceleyebilir, atama ve süreç
+                bilgilerini düzenleyebilirsiniz.
+            </p>
+        </div>
+
+        <a asp-controller="Analyst"
+           asp-action="Inbox"
+           class="btn btn-outline-secondary">
+            Gelen Kutusuna Dön
+        </a>
+    </div>
+
+    <!-- Mesajlar -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show"
+             role="alert">
+
+            @TempData["SuccessMessage"]
+
+            <button type="button"
+                    class="btn-close"
+                    data-bs-dismiss="alert"
+                    aria-label="Kapat">
+            </button>
+        </div>
+    }
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show"
+             role="alert">
+
+            @TempData["ErrorMessage"]
+
+            <button type="button"
+                    class="btn-close"
+                    data-bs-dismiss="alert"
+                    aria-label="Kapat">
+            </button>
+        </div>
+    }
+
+    <div class="row g-4">
+
+        <!-- Sol taraf: Talep bilgileri -->
+        <div class="col-12 col-xl-5">
+
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3">
+                    <h5 class="fw-bold mb-0">
+                        Temel Talep Bilgileri
+                    </h5>
+                </div>
+
+                <div class="card-body">
+
+                    <dl class="row mb-0">
+
+                        <dt class="col-sm-5 text-muted">
+                            Talep No
+                        </dt>
+                        <dd class="col-sm-7 fw-semibold">
+                            @Model.RequestNumber
+                        </dd>
+
+                        <dt class="col-sm-5 text-muted">
+                            Departman
+                        </dt>
+                        <dd class="col-sm-7">
+                            @Model.Department
+                        </dd>
+
+                        <dt class="col-sm-5 text-muted">
+                            Öncelik
+                        </dt>
+                        <dd class="col-sm-7">
+                            @Model.Priority
+                        </dd>
+
+                        <dt class="col-sm-5 text-muted">
+                            İş Akışı Durumu
+                        </dt>
+                        <dd class="col-sm-7">
+                            <span class="badge bg-primary-subtle text-primary">
+                                @workflowText
+                            </span>
+                        </dd>
+
+                        <dt class="col-sm-5 text-muted">
+                            Mevcut Statü
+                        </dt>
+                        <dd class="col-sm-7">
+                            @if (string.IsNullOrWhiteSpace(Model.CurrentStatus))
+                            {
+                                <span class="text-muted">
+                                    Henüz belirlenmedi
+                                </span>
+                            }
+                            else
+                            {
+                                @Model.CurrentStatus
+                            }
+                        </dd>
+
+                        <dt class="col-sm-5 text-muted">
+                            Oluşturulma Tarihi
+                        </dt>
+                        <dd class="col-sm-7">
+                            @(Model.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm"))
+                        </dd>
+
+                    </dl>
+
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="fw-bold mb-0">
+                        Talep Açıklaması
+                    </h5>
+                </div>
+
+                <div class="card-body">
+                    <p class="mb-0"
+                       style="white-space: pre-wrap;">
+                        @Model.RequestDescription
+                    </p>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Sağ taraf: Analiz ve atama formu -->
+        <div class="col-12 col-xl-7">
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="fw-bold mb-1">
+                        Analiz ve Atama Bilgileri
+                    </h5>
+
+                    <p class="text-muted mb-0"
+                       style="font-size: 0.85rem;">
+                        Bilgileri tamamladıktan sonra önce taslak olarak
+                        kaydediniz.
+                    </p>
+                </div>
+
+                <div class="card-body">
+
+                    <form asp-controller="Analyst"
+                          asp-action="SaveAnalysis"
+                          asp-route-id="@Model.Id"
+                          method="post">
+
+                        @Html.AntiForgeryToken()
+
+                        @if (!ViewData.ModelState.IsValid)
+                        {
+                            <div asp-validation-summary="All"
+                                 class="alert alert-danger mb-4">
+                            </div>
+                        }
+
+                        <!-- Atama bilgileri -->
+                        <div class="row g-3 mb-3">
+
+                            <div class="col-12 col-md-6">
+                                <label for="analystId"
+                                       class="form-label">
+                                    Analist
+                                </label>
+
+                                <input id="analystId"
+                                       name="analystId"
+                                       type="number"
+                                       min="1"
+                                       class="form-control"
+                                       value="@Model.AnalystId"
+                                       placeholder="Analist kullanıcı ID" />
+
+                                @Html.ValidationMessage(
+                                    "analystId",
+                                    "",
+                                    new { @class = "text-danger" }
+                                )
+
+                                <div class="form-text">
+                                    Bu sayısal ID alanı geçici MVP alanıdır;
+                                    çalışan tablosu eklendiğinde seçim
+                                    listesine dönüştürülecektir.
+                                </div>
+                            </div>
+
+                            <div class="col-12 col-md-6">
+                                <label for="developerId"
+                                       class="form-label">
+                                    Yazılımcı
+                                </label>
+
+                                <input id="developerId"
+                                       name="developerId"
+                                       type="number"
+                                       min="1"
+                                       class="form-control"
+                                       value="@Model.DeveloperId"
+                                       placeholder="Yazılımcı kullanıcı ID" />
+
+                                @Html.ValidationMessage(
+                                    "developerId",
+                                    "",
+                                    new { @class = "text-danger" }
+                                )
+
+                                <div class="form-text">
+                                    Bu sayısal ID alanı geçici MVP alanıdır;
+                                    AI önerileri daha sonra bu alanda
+                                    gösterilecektir.
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <!-- Tarihler -->
+                        <div class="row g-3 mb-3">
+
+                            <div class="col-12 col-md-6">
+                                <label for="releaseDate"
+                                       class="form-label">
+                                    Sürüm Tarihi
+                                </label>
+
+                                <input id="releaseDate"
+                                       name="releaseDate"
+                                       type="date"
+                                       class="form-control"
+                                       value="@releaseDateValue" />
+
+                                @Html.ValidationMessage(
+                                    "releaseDate",
+                                    "",
+                                    new { @class = "text-danger" }
+                                )
+                            </div>
+
+                            <div class="col-12 col-md-6">
+                                <label for="banksoftDeliveryDate"
+                                       class="form-label">
+                                    Banksoft Teslim Tarihi
+                                </label>
+
+                                <input id="banksoftDeliveryDate"
+                                       name="banksoftDeliveryDate"
+                                       type="date"
+                                       class="form-control"
+                                       value="@banksoftDeliveryDateValue" />
+
+                                @Html.ValidationMessage(
+                                    "banksoftDeliveryDate",
+                                    "",
+                                    new { @class = "text-danger" }
+                                )
+                            </div>
+
+                        </div>
+
+                        <!-- Statüler -->
+                        <div class="row g-3 mb-3">
+
+                            <div class="col-12 col-md-6">
+                                <label for="expectedStatus"
+                                       class="form-label">
+                                    Beklenen Statü
+                                </label>
+
+                                <input id="expectedStatus"
+                                       name="expectedStatus"
+                                       class="form-control"
+                                       value="@Model.ExpectedStatus"
+                                       placeholder="Örn: Geliştirme Tamamlandı" />
+
+                                @Html.ValidationMessage(
+                                    "expectedStatus",
+                                    "",
+                                    new { @class = "text-danger" }
+                                )
+                            </div>
+
+                            <div class="col-12 col-md-6">
+                                <label for="currentStatus"
+                                       class="form-label">
+                                    Mevcut Statü
+                                </label>
+
+                                <select id="currentStatus"
+                                        name="currentStatus"
+                                        class="form-select">
+
+                                    <option value="">
+                                        Statü seçiniz
+                                    </option>
+
+                                    @foreach (string statusOption in currentStatusOptions)
+                                    {
+                                        <option value="@statusOption"
+                                                selected="@(string.Equals(Model.CurrentStatus, statusOption, StringComparison.Ordinal))">
+                                            @statusOption
+                                        </option>
+                                    }
+
+                                </select>
+
+                                @Html.ValidationMessage(
+                                    "currentStatus",
+                                    "",
+                                    new { @class = "text-danger" }
+                                )
+                            </div>
+
+                        </div>
+
+                        <!-- Analist notu -->
+                        <div class="mb-4">
+                            <label for="analystNote"
+                                   class="form-label">
+                                Analist Notu
+                            </label>
+
+                            <textarea id="analystNote"
+                                      name="analystNote"
+                                      class="form-control"
+                                      rows="5"
+                                      maxlength="1000"
+                                      placeholder="Talep analizi, atama gerekçesi ve gerekli açıklamaları yazınız.">@Model.AnalystNote</textarea>
+
+                            @Html.ValidationMessage(
+                                "analystNote",
+                                "",
+                                new { @class = "text-danger" }
+                            )
+                        </div>
+
+                        <div class="d-flex justify-content-end">
+                            <button type="submit"
+                                    class="btn btn-primary">
+                                Taslağı Kaydet
+                            </button>
+                        </div>
+
+                    </form>
+
+                    <hr class="my-4" />
+
+                    <!-- Yönetici onayına gönderme -->
+                    <div class="d-flex flex-column flex-md-row
+                                justify-content-between align-items-md-center
+                                gap-3">
+
+                        <div>
+                            <h6 class="fw-bold mb-1">
+                                Departman Yöneticisi Onayı
+                            </h6>
+
+                            <p class="text-muted mb-0"
+                               style="font-size: 0.85rem;">
+                                Yöneticiye göndermeden önce yaptığınız
+                                değişiklikleri kaydetmeniz gerekir.
+                            </p>
+                        </div>
+
+                        <form asp-controller="Analyst"
+                              asp-action="SubmitForApproval"
+                              asp-route-id="@Model.Id"
+                              method="post">
+
+                            @Html.AntiForgeryToken()
+
+                            <button type="submit"
+                                    class="btn btn-success">
+                                Yönetici Onayına Gönder
+                            </button>
+
+                        </form>
+
+                    </div>
+
+                </div>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(Model.ManagerNote))
+            {
+                <div class="alert alert-warning mt-4">
+                    <h6 class="fw-bold">
+                        Departman Yöneticisi Notu
+                    </h6>
+
+                    <p class="mb-0">
+                        @Model.ManagerNote
+                    </p>
+                </div>
+            }
+
+        </div>
+
+    </div>
+
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}
