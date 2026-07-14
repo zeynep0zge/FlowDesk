@@ -623,3 +623,33 @@ body {
         padding: 1.25rem;
     }
 }
+
+/* Analyst Inbox – date & action column alignment */
+.inbox-date-cell {
+    white-space: nowrap;
+    vertical-align: middle;
+    text-align: center;
+}
+
+.inbox-action-cell {
+    vertical-align: middle;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.review-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 155px;
+    white-space: nowrap;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.review-action-btn:focus,
+.review-action-btn:focus-visible,
+.review-action-btn:active {
+    outline: none !important;
+    box-shadow: none !important;
+}
