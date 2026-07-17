@@ -1,0 +1,255 @@
+﻿@model FlowDesk.ViewModels.DepartmentManager.ManagerReviewViewModel
+@using FlowDesk.Models
+
+@{
+    ViewData["Title"] = "Talep İnceleme";
+
+    string priorityText = Model.Priority switch
+    {
+        RequestPriority.Low => "Düşük",
+        RequestPriority.Normal => "Normal",
+        RequestPriority.High => "Yüksek",
+        RequestPriority.Critical => "Kritik",
+        _ => Model.Priority.ToString()
+    };
+
+    string priorityClass = Model.Priority switch
+    {
+        RequestPriority.Low => "bg-success text-white",
+        RequestPriority.Normal => "bg-primary text-white",
+        RequestPriority.High => "bg-warning text-dark",
+        RequestPriority.Critical => "bg-danger text-white",
+        _ => "bg-secondary text-white"
+    };
+}
+
+<div class="container-fluid py-4 text-dark">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1 text-dark">
+                Talep İnceleme
+            </h2>
+
+            <p class="text-secondary mb-0">
+                Talep No: @Model.RequestNumber
+            </p>
+        </div>
+
+        <a asp-controller="DepartmentManager"
+           asp-action="Inbox"
+           class="btn btn-outline-secondary">
+            Gelen Kutusuna Dön
+        </a>
+    </div>
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger text-dark">
+            @TempData["ErrorMessage"]
+        </div>
+    }
+
+    <div class="row g-4">
+
+        <div class="col-lg-7">
+
+            <div class="card border-0 shadow-sm bg-white mb-4">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="mb-0 text-dark">
+                        Talep Bilgileri
+                    </h5>
+                </div>
+
+                <div class="card-body text-dark">
+                    <div class="row g-3">
+
+                        <div class="col-md-6">
+                            <div class="small text-secondary">Talep No</div>
+                            <div class="fw-semibold text-dark">
+                                @Model.RequestNumber
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="small text-secondary">Departman</div>
+                            <div class="fw-semibold text-dark">
+                                @Model.Department
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="small text-secondary">Öncelik</div>
+                            <span class="badge rounded-pill @priorityClass">
+                                @priorityText
+                            </span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="small text-secondary">Durum</div>
+                            <span class="badge rounded-pill bg-warning text-dark">
+                                Yönetici Onayı Bekliyor
+                            </span>
+                        </div>
+
+                        <div class="col-12">
+                            <div class="small text-secondary">
+                                Talep Açıklaması
+                            </div>
+
+                            <div class="text-dark">
+                                @Model.RequestDescription
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="small text-secondary">
+                                Oluşturulma Tarihi
+                            </div>
+
+                            <div class="text-dark">
+                                @Model.CreatedAt.ToString("dd.MM.yyyy HH:mm")
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm bg-white">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="mb-0 text-dark">
+                        Analist Bilgileri
+                    </h5>
+                </div>
+
+                <div class="card-body text-dark">
+                    <div class="row g-3">
+
+                        <div class="col-md-6">
+                            <div class="small text-secondary">Analist ID</div>
+                            <div class="text-dark">
+                                @(Model.AnalystId?.ToString() ?? "-")
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="small text-secondary">Yazılımcı ID</div>
+                            <div class="text-dark">
+                                @(Model.DeveloperId?.ToString() ?? "-")
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="small text-secondary">Sürüm Tarihi</div>
+                            <div class="text-dark">
+                                @(Model.ReleaseDate?.ToString("dd.MM.yyyy") ?? "-")
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="small text-secondary">
+                                Banksoft Teslim Tarihi
+                            </div>
+
+                            <div class="text-dark">
+                                @(Model.BanksoftDeliveryDate?.ToString("dd.MM.yyyy") ?? "-")
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="small text-secondary">
+                                Beklenen Statü
+                            </div>
+
+                            <div class="text-dark">
+                                @(Model.ExpectedStatus ?? "-")
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="small text-secondary">
+                                Mevcut Statü
+                            </div>
+
+                            <div class="text-dark">
+                                @(Model.CurrentStatus ?? "-")
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <div class="small text-secondary">Analist Notu</div>
+
+                            <div class="border rounded bg-light p-3 text-dark">
+                                @(Model.AnalystNote ?? "Analist notu bulunmuyor.")
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="col-lg-5">
+
+            <div class="card border-0 shadow-sm bg-white">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="mb-0 text-dark">
+                        Yönetici Kararı
+                    </h5>
+                </div>
+
+                <div class="card-body text-dark">
+
+                    <form method="post">
+                        @Html.AntiForgeryToken()
+
+                        <div class="mb-3">
+                            <label for="managerNote"
+                                   class="form-label fw-semibold text-dark">
+                                Yönetici Notu
+                            </label>
+
+                            <textarea id="managerNote"
+                                      name="ManagerNote"
+                                      class="form-control text-dark"
+                                      rows="6"
+                                      maxlength="1000"
+                                      placeholder="Onay veya iade açıklamasını yazın...">@Model.ManagerNote</textarea>
+
+                            <div class="form-text text-secondary">
+                                Analiste iade işleminde yönetici notu zorunludur.
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+
+                            <button type="submit"
+                                    formaction="@Url.Action(
+                                                                            "Approve",
+                                                                            "DepartmentManager",
+                                                                            new { id = Model.Id })"
+                                    class="btn btn-success text-white">
+                                Talebi Onayla
+                            </button>
+
+                            <button type="submit"
+                                    formaction="@Url.Action(
+                                                                            "ReturnToAnalyst",
+                                                                            "DepartmentManager",
+                                                                            new { id = Model.Id })"
+                                    class="btn btn-danger text-white">
+                                Analiste İade Et
+                            </button>
+
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+</div>

@@ -10,9 +10,16 @@ namespace FlowDesk.Repositories.Interfaces
 
         Task<int> GetReturnedRequestsCountAsync();
 
+        Task<List<WorkItem>>
+            GetWaitingManagerApprovalAsync();
+
+        Task<List<WorkItem>>
+            GetApprovedRequestsAsync();
+
         Task<WorkItem?> GetByIdAsync(int id);
 
-        Task<WorkItem?> GetByIdAsNoTrackingAsync(int id);
+        Task<WorkItem?>
+            GetByIdAsNoTrackingAsync(int id);
 
         Task<int> SaveChangesAsync();
     }

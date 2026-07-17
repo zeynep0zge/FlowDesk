@@ -5,6 +5,7 @@ using FlowDesk.Repositories.Interfaces;
 using FlowDesk.Services;
 using FlowDesk.Services.Interfaces;
 
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllersWithViews();
@@ -22,6 +23,23 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<IWorkItemRepository, WorkItemRepository>();
 
 builder.Services.AddScoped<IAnalystWorkflowService, AnalystWorkflowService>();
+
+builder.Services.AddScoped<
+    IWorkItemRepository,
+    WorkItemRepository>();
+
+builder.Services.AddScoped<
+    IAnalystWorkflowService,
+    AnalystWorkflowService>();
+
+builder.Services.AddScoped<
+    IDepartmentManagerWorkflowService,
+    DepartmentManagerWorkflowService>();
+
+builder.Services.AddScoped<
+    IExcelExportService,
+    ExcelExportService>();
+
 var app = builder.Build();
 
 // HTTP request pipeline

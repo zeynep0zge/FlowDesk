@@ -1,6 +1,8 @@
 ﻿using FlowDesk.Common;
 using FlowDesk.DTOs.Analyst;
 using FlowDesk.ViewModels.Analyst;
+using FlowDesk.ViewModels.DepartmentManager;
+
 
 namespace FlowDesk.Services.Interfaces
 {

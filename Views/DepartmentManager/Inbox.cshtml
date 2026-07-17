@@ -1,0 +1,183 @@
+﻿@model FlowDesk.ViewModels.DepartmentManager.ManagerInboxViewModel
+@using FlowDesk.Models
+
+@{
+    ViewData["Title"] = "Yönetici Onay Kutusu";
+
+    var requests = Model?.Requests
+        ?? new List<FlowDesk.ViewModels.DepartmentManager.ManagerInboxItemViewModel>();
+}
+
+<div class="container-fluid py-4 text-dark">
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h2 class="mb-1 text-dark">
+                Departman Yöneticisi Onay Kutusu
+            </h2>
+
+            <p class="text-secondary mb-0">
+                Analist tarafından onaya gönderilen talepler
+            </p>
+        </div>
+
+        <div class="card border-0 shadow-sm bg-white">
+            <div class="card-body px-4 py-3 text-center text-dark">
+                <div class="small text-secondary">
+                    Onay Bekleyen
+                </div>
+
+                <div class="fs-3 fw-bold text-dark">
+                    @requests.Count
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show"
+             role="alert">
+            @TempData["SuccessMessage"]
+
+            <button type="button"
+                    class="btn-close"
+                    data-bs-dismiss="alert"
+                    aria-label="Kapat">
+            </button>
+        </div>
+    }
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show"
+             role="alert">
+            @TempData["ErrorMessage"]
+
+            <button type="button"
+                    class="btn-close"
+                    data-bs-dismiss="alert"
+                    aria-label="Kapat">
+            </button>
+        </div>
+    }
+
+    <div class="card border-0 shadow-sm bg-white">
+        <div class="card-header bg-white border-bottom py-3">
+            <h5 class="mb-0 text-dark">
+                Onay Bekleyen Talepler
+            </h5>
+        </div>
+
+        <div class="card-body p-0 text-dark">
+
+            @if (!requests.Any())
+            {
+                <div class="text-center py-5 text-dark">
+                    <h5 class="text-dark">
+                        Onay bekleyen talep bulunmuyor
+                    </h5>
+
+                    <p class="text-secondary mb-0">
+                        Analist tarafından gönderilen talepler burada görüntülenecek.
+                    </p>
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0 text-dark">
+                        <thead class="table-light text-dark">
+                            <tr>
+                                <th class="px-4 py-3 text-dark">Talep No</th>
+                                <th class="py-3 text-dark">Talep</th>
+                                <th class="py-3 text-dark">Departman</th>
+                                <th class="py-3 text-dark">Öncelik</th>
+                                <th class="py-3 text-dark">Durum</th>
+                                <th class="py-3 text-dark">Güncellenme</th>
+                                <th class="px-4 py-3 text-end text-dark">
+                                    İşlem
+                                </th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            @foreach (var item in requests)
+                            {
+                                string priorityText = item.Priority switch
+                                {
+                                    RequestPriority.Low => "Düşük",
+                                    RequestPriority.Normal => "Normal",
+                                    RequestPriority.High => "Yüksek",
+                                    RequestPriority.Critical => "Kritik",
+                                    _ => item.Priority.ToString()
+                                };
+
+                                string priorityClass = item.Priority switch
+                                {
+                                    RequestPriority.Low =>
+                                    "bg-success text-white",
+
+                                    RequestPriority.Normal =>
+                                    "bg-primary text-white",
+
+                                    RequestPriority.High =>
+                                    "bg-warning text-dark",
+
+                                    RequestPriority.Critical =>
+                                    "bg-danger text-white",
+
+                                    _ =>
+                                    "bg-secondary text-white"
+                                };
+
+                                DateTime displayedDate =
+                                item.UpdatedAt ?? item.CreatedAt;
+
+                                <tr class="text-dark">
+                                    <td class="px-4 fw-semibold text-dark">
+                                        @item.RequestNumber
+                                    </td>
+
+                                    <td class="text-dark"
+                                        style="min-width: 250px;">
+                                        @item.RequestDescription
+                                    </td>
+
+                                    <td class="text-dark">
+                                        @item.Department
+                                    </td>
+
+                                    <td>
+                                        <span class="badge rounded-pill @priorityClass">
+                                            @priorityText
+                                        </span>
+                                    </td>
+
+                                    <td>
+                                        <span class="badge rounded-pill bg-warning text-dark">
+                                            Yönetici Onayı Bekliyor
+                                        </span>
+                                    </td>
+
+                                    <td class="text-nowrap text-dark">
+                                        @displayedDate.ToString("dd.MM.yyyy HH:mm")
+                                    </td>
+
+                                    <td class="px-4 text-end">
+                                        <a asp-controller="DepartmentManager"
+                                           asp-action="Review"
+                                           asp-route-id="@item.Id"
+                                           class="btn btn-primary btn-sm text-white text-nowrap">
+                                            Talebi İncele
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>
