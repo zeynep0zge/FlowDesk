@@ -2,5 +2,6 @@
 {
     public class SubmitForApprovalDto
     {
+        public int WorkItemId { get; set; }
     }
 }
