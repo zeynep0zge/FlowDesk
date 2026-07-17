@@ -1,10 +1,10 @@
-﻿@model IEnumerable<FlowDesk.Models.WorkItem>
+﻿@model IEnumerable<FlowDesk.ViewModels.Analyst.AnalystInboxItemViewModel>
 
 @{
-    ViewData["Title"] = "Yönetici Tarafından İade Edilenler";
+    ViewData["Title"] = "İade Edilen Talepler";
 
     var requests = Model?.ToList()
-        ?? new List<FlowDesk.Models.WorkItem>();
+        ?? new List<FlowDesk.ViewModels.Analyst.AnalystInboxItemViewModel>();
 }
 
 <div class="container-fluid p-0">
