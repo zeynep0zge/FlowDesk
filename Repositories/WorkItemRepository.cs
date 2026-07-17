@@ -43,13 +43,38 @@ namespace FlowDesk.Repositories
                     x.WorkflowStatus == WorkflowStatus.ReturnedToAnalyst);
         }
 
+        public async Task<List<WorkItem>>
+            GetWaitingManagerApprovalAsync()
+        {
+            return await _context.WorkItems
+                .AsNoTracking()
+                .Where(x =>
+                    x.WorkflowStatus ==
+                    WorkflowStatus.WaitingManagerApproval)
+                .OrderByDescending(x => x.UpdatedAt ?? x.CreatedAt)
+                .ToListAsync();
+        }
+
+        public async Task<List<WorkItem>>
+            GetApprovedRequestsAsync()
+        {
+            return await _context.WorkItems
+                .AsNoTracking()
+                .Where(x =>
+                    x.WorkflowStatus ==
+                    WorkflowStatus.Approved)
+                .OrderByDescending(x => x.UpdatedAt ?? x.CreatedAt)
+                .ToListAsync();
+        }
+
         public async Task<WorkItem?> GetByIdAsync(int id)
         {
             return await _context.WorkItems
                 .FirstOrDefaultAsync(x => x.Id == id);
         }
 
-        public async Task<WorkItem?> GetByIdAsNoTrackingAsync(int id)
+        public async Task<WorkItem?>
+            GetByIdAsNoTrackingAsync(int id)
         {
             return await _context.WorkItems
                 .AsNoTracking()
