@@ -1,23 +1,15 @@
-@model IEnumerable<FlowDesk.Models.WorkItem>
-
+@model FlowDesk.ViewModels.Analyst.AnalystInboxViewModel
 @using FlowDesk.Models
 
 @{
     ViewData["Title"] = "Analist Gelen Kutusu";
 
-    var workItems = Model?.ToList() ?? new List<WorkItem>();
+    var workItems = Model.WorkItems;
 
-    int totalCount = workItems.Count;
-
-    int newRequestCount = workItems.Count(x =>
-        x.WorkflowStatus == WorkflowStatus.Submitted);
-
-    int reviewingCount = workItems.Count(x =>
-        x.WorkflowStatus == WorkflowStatus.UnderAnalystReview);
-
-    int returnedCount = ViewData["ReturnedToAnalystCount"] is int count
-        ? count
-        : 0;
+    int totalCount = Model.TotalCount;
+    int newRequestCount = Model.NewRequestCount;
+    int reviewingCount = Model.ReviewingCount;
+    int returnedCount = Model.ReturnedCount;
 }
 
 <div class="container-fluid p-0">
@@ -241,18 +233,18 @@
                                 string priorityClass = item.Priority switch
                                 {
                                     RequestPriority.Low =>
-                                        "bg-success-subtle text-success",
+                                    "bg-success-subtle text-dark",
 
                                     RequestPriority.Normal =>
-                                        "bg-primary-subtle text-primary",
+                                    "bg-primary-subtle text-dark",
 
                                     RequestPriority.High =>
-                                        "bg-warning-subtle text-warning-emphasis",
+                                    "bg-warning-subtle text-dark",
 
                                     RequestPriority.Critical =>
-                                        "bg-danger-subtle text-danger",
+                                    "bg-danger-subtle text-dark",
 
-                                    _ => "bg-secondary-subtle text-secondary"
+                                    _ => "bg-secondary-subtle text-dark"
                                 };
 
                                 string workflowText = item.WorkflowStatus switch
@@ -269,12 +261,12 @@
                                 string workflowClass = item.WorkflowStatus switch
                                 {
                                     WorkflowStatus.Submitted =>
-                                        "bg-info-subtle text-dark",
+                                    "bg-info-subtle text-dark",
 
                                     WorkflowStatus.UnderAnalystReview =>
-                                        "bg-warning-subtle text-warning-emphasis",
+                                    "bg-warning-subtle text-dark",
 
-                                    _ => "bg-secondary-subtle text-secondary"
+                                    _ => "bg-secondary-subtle text-dark"
                                 };
 
                                 <tr>

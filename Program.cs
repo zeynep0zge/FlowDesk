@@ -1,5 +1,9 @@
 using FlowDesk.Data;
 using Microsoft.EntityFrameworkCore;
+using FlowDesk.Repositories;
+using FlowDesk.Repositories.Interfaces;
+using FlowDesk.Services;
+using FlowDesk.Services.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,8 +17,11 @@ string connectionString =
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(connectionString)
-);
 
+);
+builder.Services.AddScoped<IWorkItemRepository, WorkItemRepository>();
+
+builder.Services.AddScoped<IAnalystWorkflowService, AnalystWorkflowService>();
 var app = builder.Build();
 
 // HTTP request pipeline

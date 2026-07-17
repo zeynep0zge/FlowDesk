@@ -1,6 +1,64 @@
-﻿namespace FlowDesk.Repositories
+﻿using FlowDesk.Data;
+using FlowDesk.Models;
+using FlowDesk.Repositories.Interfaces;
+using Microsoft.EntityFrameworkCore;
+
+namespace FlowDesk.Repositories
 {
-    public class WorkItemRepository
+    public class WorkItemRepository : IWorkItemRepository
     {
+        private readonly AppDbContext _context;
+
+        public WorkItemRepository(AppDbContext context)
+        {
+            _context = context;
+        }
+
+        public async Task<List<WorkItem>> GetAnalystInboxAsync()
+        {
+            return await _context.WorkItems
+                .AsNoTracking()
+                .Where(x =>
+                    x.WorkflowStatus == WorkflowStatus.Submitted ||
+                    x.WorkflowStatus == WorkflowStatus.UnderAnalystReview)
+                .OrderByDescending(x => x.CreatedAt)
+                .ToListAsync();
+        }
+
+        public async Task<List<WorkItem>> GetReturnedRequestsAsync()
+        {
+            return await _context.WorkItems
+                .AsNoTracking()
+                .Where(x =>
+                    x.WorkflowStatus == WorkflowStatus.ReturnedToAnalyst)
+                .OrderByDescending(x => x.UpdatedAt ?? x.CreatedAt)
+                .ToListAsync();
+        }
+
+        public async Task<int> GetReturnedRequestsCountAsync()
+        {
+            return await _context.WorkItems
+                .AsNoTracking()
+                .CountAsync(x =>
+                    x.WorkflowStatus == WorkflowStatus.ReturnedToAnalyst);
+        }
+
+        public async Task<WorkItem?> GetByIdAsync(int id)
+        {
+            return await _context.WorkItems
+                .FirstOrDefaultAsync(x => x.Id == id);
+        }
+
+        public async Task<WorkItem?> GetByIdAsNoTrackingAsync(int id)
+        {
+            return await _context.WorkItems
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == id);
+        }
+
+        public async Task<int> SaveChangesAsync()
+        {
+            return await _context.SaveChangesAsync();
+        }
     }
 }
