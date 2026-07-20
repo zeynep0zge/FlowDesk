@@ -162,12 +162,10 @@ namespace FlowDesk.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SubmitForApproval(
-            int id)
+            int id,
+            SubmitForApprovalDto dto)
         {
-            SubmitForApprovalDto dto = new()
-            {
-                WorkItemId = id
-            };
+            dto.WorkItemId = id;
 
             var result =
                 await _analystWorkflowService
@@ -180,23 +178,40 @@ namespace FlowDesk.Controllers
 
             if (!result.IsSuccess)
             {
-                TempData["ErrorMessage"] =
+                ModelState.AddModelError(
+                    string.Empty,
                     result.ErrorMessage ??
-                    "Talep yönetici onayına gönderilemedi.";
+                    "Talep yönetici onayına gönderilemedi."
+                );
 
                 var reviewResult =
                     await _analystWorkflowService
                         .GetReviewAsync(id);
 
-                if (reviewResult.IsSuccess)
+                if (reviewResult.IsNotFound)
                 {
-                    return RedirectToAction(
-                        nameof(Review),
-                        new { id }
-                    );
+                    return NotFound();
                 }
 
-                return RedirectToAction(nameof(Inbox));
+                if (!reviewResult.IsSuccess ||
+                    reviewResult.Data == null)
+                {
+                    TempData["ErrorMessage"] =
+                        reviewResult.ErrorMessage ??
+                        "Talep bilgileri yüklenemedi.";
+
+                    return RedirectToAction(nameof(Inbox));
+                }
+
+                ApplyPostedValues(
+                    reviewResult.Data,
+                    dto
+                );
+
+                return View(
+                    "Review",
+                    reviewResult.Data
+                );
             }
 
             TempData["SuccessMessage"] =

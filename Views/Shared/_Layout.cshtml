@@ -48,7 +48,9 @@
                     </a>
                 </li>
                 <li class="sidebar-item">
-                    <a class="sidebar-link" href="#" style="opacity: 0.65;">
+                    <a class="sidebar-link"
+                       asp-controller="DepartmentManager"
+                       asp-action="Inbox">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
                         Yönetici Onayları
                     </a>
@@ -140,17 +142,48 @@
             }
 
             // Highlighting active sidebar link
-            var currentPath = window.location.pathname.toLowerCase();
+            var normalizePath = function (path) {
+                var normalizedPath = path.toLowerCase().replace(/\/+$/, "");
+                return normalizedPath || "/";
+            };
+
+            var currentPath = normalizePath(window.location.pathname);
             var sidebarLinks = document.querySelectorAll(".sidebar-link");
+            var activeLink = null;
+            var bestMatchLength = -1;
+
             sidebarLinks.forEach(function (link) {
                 var href = link.getAttribute("href");
+
+                link.classList.remove("active");
+
                 if (href && href !== "#") {
-                    var linkPath = new URL(link.href).pathname.toLowerCase();
-                    if (currentPath === linkPath || (linkPath !== "/" && currentPath.startsWith(linkPath))) {
-                        link.classList.add("active");
+                    var linkPath = normalizePath(new URL(link.href).pathname);
+                    var matchLength = -1;
+
+                    if (currentPath === linkPath ||
+                        (linkPath !== "/" &&
+                         currentPath.startsWith(linkPath + "/"))) {
+                        matchLength = linkPath.length;
+                    } else if (linkPath !== "/") {
+                        var linkSection = "/" + linkPath.split("/")[1];
+                        var currentSection = "/" + currentPath.split("/")[1];
+
+                        if (linkSection === currentSection) {
+                            matchLength = linkSection.length;
+                        }
+                    }
+
+                    if (matchLength > bestMatchLength) {
+                        activeLink = link;
+                        bestMatchLength = matchLength;
                     }
                 }
             });
+
+            if (activeLink) {
+                activeLink.classList.add("active");
+            }
         });
     </script>
 

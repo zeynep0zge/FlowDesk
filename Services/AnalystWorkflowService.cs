@@ -285,46 +285,46 @@ namespace FlowDesk.Services.Interfaces
                 );
             }
 
-            workItem.ExpectedStatus =
-                NormalizeNullableText(
-                    workItem.ExpectedStatus
-                );
+            string? expectedStatus =
+                NormalizeNullableText(dto.ExpectedStatus);
+
+            string? analystNote =
+                NormalizeNullableText(dto.AnalystNote);
 
             List<string> missingFields = new();
             List<string> invalidFields = new();
 
-            if (!workItem.AnalystId.HasValue)
+            if (!dto.AnalystId.HasValue)
             {
                 missingFields.Add("analist");
             }
-            else if (workItem.AnalystId.Value <= 0)
+            else if (dto.AnalystId.Value <= 0)
             {
                 invalidFields.Add("analist ID");
             }
 
-            if (!workItem.DeveloperId.HasValue)
+            if (!dto.DeveloperId.HasValue)
             {
                 missingFields.Add("yazılımcı");
             }
-            else if (workItem.DeveloperId.Value <= 0)
+            else if (dto.DeveloperId.Value <= 0)
             {
                 invalidFields.Add("yazılımcı ID");
             }
 
-            if (!workItem.ReleaseDate.HasValue)
+            if (!dto.ReleaseDate.HasValue)
             {
                 missingFields.Add("sürüm tarihi");
             }
 
-            if (!workItem.BanksoftDeliveryDate.HasValue)
+            if (!dto.BanksoftDeliveryDate.HasValue)
             {
                 missingFields.Add(
                     "Banksoft teslim tarihi"
                 );
             }
 
-            if (string.IsNullOrWhiteSpace(
-                workItem.ExpectedStatus))
+            if (expectedStatus == null)
             {
                 missingFields.Add("beklenen statü");
             }
@@ -348,11 +348,20 @@ namespace FlowDesk.Services.Interfaces
                 );
             }
 
+            if (analystNote != null &&
+                analystNote.Length > 1000)
+            {
+                return ServiceResult.Failure(
+                    "Analist notu en fazla " +
+                    "1000 karakter olabilir."
+                );
+            }
+
             DateTime releaseDate =
-                workItem.ReleaseDate.GetValueOrDefault();
+                dto.ReleaseDate.GetValueOrDefault();
 
             DateTime banksoftDeliveryDate =
-                workItem.BanksoftDeliveryDate
+                dto.BanksoftDeliveryDate
                     .GetValueOrDefault();
 
             if (banksoftDeliveryDate.Date >
@@ -363,6 +372,16 @@ namespace FlowDesk.Services.Interfaces
                     "sürüm tarihinden sonra olamaz."
                 );
             }
+
+            workItem.AnalystId = dto.AnalystId;
+            workItem.DeveloperId = dto.DeveloperId;
+            workItem.ReleaseDate = dto.ReleaseDate;
+
+            workItem.BanksoftDeliveryDate =
+                dto.BanksoftDeliveryDate;
+
+            workItem.ExpectedStatus = expectedStatus;
+            workItem.AnalystNote = analystNote;
 
             workItem.WorkflowStatus =
                 WorkflowStatus.WaitingManagerApproval;
