@@ -1,7 +1,6 @@
 ﻿namespace FlowDesk.DTOs.Analyst
 {
-    public class SubmitForApprovalDto
+    public class SubmitForApprovalDto : SaveAnalysisDto
     {
-        public int WorkItemId { get; set; }
     }
 }

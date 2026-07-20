@@ -32,19 +32,7 @@
             </p>
         </div>
 
-        <a asp-controller="Analyst"
-           asp-action="ReturnedRequests"
-           class="btn btn-outline-secondary">
 
-            Yönetici Tarafından İade Edilenler
-
-            @if (returnedCount > 0)
-            {
-                <span class="badge bg-danger ms-1">
-                    @returnedCount
-                </span>
-            }
-        </a>
     </div>
 
     <!-- Bildirimler -->
@@ -82,7 +70,9 @@
     <div class="row g-3 mb-4">
 
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card border-0 shadow-sm h-100">
+            <a asp-controller="Analyst"
+               asp-action="Inbox"
+               class="card border-0 shadow-sm h-100 text-decoration-none text-reset">
                 <div class="card-body">
                     <p class="text-muted mb-2">
                         Toplam Talep
@@ -92,11 +82,13 @@
                         @totalCount
                     </h3>
                 </div>
-            </div>
+            </a>
         </div>
 
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card border-0 shadow-sm h-100">
+            <a asp-controller="Analyst"
+               asp-action="Inbox"
+               class="card border-0 shadow-sm h-100 text-decoration-none text-reset">
                 <div class="card-body">
                     <p class="text-muted mb-2">
                         Yeni Talepler
@@ -106,11 +98,13 @@
                         @newRequestCount
                     </h3>
                 </div>
-            </div>
+            </a>
         </div>
 
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card border-0 shadow-sm h-100">
+            <a asp-controller="Analyst"
+               asp-action="Inbox"
+               class="card border-0 shadow-sm h-100 text-decoration-none text-reset">
                 <div class="card-body">
                     <p class="text-muted mb-2">
                         İncelemede
@@ -120,11 +114,13 @@
                         @reviewingCount
                     </h3>
                 </div>
-            </div>
+            </a>
         </div>
 
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card border-0 shadow-sm h-100">
+            <a asp-controller="Analyst"
+               asp-action="ReturnedRequests"
+               class="card border-0 shadow-sm h-100 text-decoration-none text-reset">
                 <div class="card-body">
                     <p class="text-muted mb-2">
                         İade Edilen
@@ -134,7 +130,7 @@
                         @returnedCount
                     </h3>
                 </div>
-            </div>
+            </a>
         </div>
 
     </div>
