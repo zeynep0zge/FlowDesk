@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Security.Claims;
+using FlowDesk.Common;
 using FlowDesk.Data;
 using FlowDesk.Models;
 
@@ -81,6 +82,8 @@ namespace FlowDesk.Controllers
                     "Bu talep numarası daha önce kullanılmış."
                 );
             }
+
+            ValidateDepartment(workItem);
 
             if (!ModelState.IsValid)
             {
@@ -241,6 +244,8 @@ namespace FlowDesk.Controllers
                 );
             }
 
+            ValidateDepartment(workItem);
+
             if (!ModelState.IsValid)
             {
                 return View(workItem);
@@ -341,6 +346,18 @@ namespace FlowDesk.Controllers
 
             // Login sistemi henüz yapılmadıysa null döner.
             return null;
+        }
+
+        private void ValidateDepartment(WorkItem workItem)
+        {
+            if (!string.IsNullOrWhiteSpace(workItem.Department) &&
+                !DepartmentOptions.Contains(workItem.Department))
+            {
+                ModelState.AddModelError(
+                    nameof(workItem.Department),
+                    "Geçerli bir departman seçiniz."
+                );
+            }
         }
     }
 }

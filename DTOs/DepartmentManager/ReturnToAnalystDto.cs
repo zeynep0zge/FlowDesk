@@ -5,5 +5,6 @@
         public int WorkItemId { get; set; }
 
         public string? ManagerNote { get; set; }
+
     }
 }

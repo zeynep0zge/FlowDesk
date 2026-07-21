@@ -17,7 +17,7 @@ namespace FlowDesk.ViewModels.Analyst
         public int ReviewingCount => WorkItems.Count(x =>
             x.WorkflowStatus == WorkflowStatus.UnderAnalystReview);
     }
-
+    //  employee-- ortak noktasını tutar.
     public class AnalystInboxItemViewModel
     {
         public int Id { get; set; }

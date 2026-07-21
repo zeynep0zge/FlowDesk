@@ -100,9 +100,11 @@
                                 İlgili Departman
                             </label>
 
-                            <input asp-for="Department"
-                                   class="form-control"
-                                   placeholder="Örn: ATM Uygulamaları" />
+                            <select asp-for="Department"
+                                    asp-items="@(new Microsoft.AspNetCore.Mvc.Rendering.SelectList(FlowDesk.Common.DepartmentOptions.All))"
+                                    class="form-select">
+                                <option value="">Departman seçiniz</option>
+                            </select>
 
                             <span asp-validation-for="Department"
                                   class="text-danger"
