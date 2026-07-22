@@ -1,183 +1,154 @@
-﻿@model FlowDesk.ViewModels.DepartmentManager.ManagerInboxViewModel
+@model FlowDesk.ViewModels.DepartmentManager.ManagerInboxViewModel
 @using FlowDesk.Models
 
 @{
-    ViewData["Title"] = "Yönetici Onay Kutusu";
+    ViewData["Title"] = "Departman Yöneticisi Dashboard";
 
     var requests = Model?.Requests
         ?? new List<FlowDesk.ViewModels.DepartmentManager.ManagerInboxItemViewModel>();
+    var recentReports = requests
+        .OrderByDescending(x => x.UpdatedAt ?? x.CreatedAt)
+        .Take(6)
+        .ToList();
+
+    var totalCount = requests.Count;
+    var pendingApprovalCount = requests.Count;
+    const int inProgressDeveloperCount = 0;
+    const int overdueCount = 0;
 }
 
-<div class="container-fluid py-4 text-dark">
-
+<div class="container-fluid p-0">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
         <div>
-            <h2 class="mb-1 text-dark">
-                Departman Yöneticisi Onay Kutusu
-            </h2>
-
-            <p class="text-secondary mb-0">
-                Analist tarafından onaya gönderilen talepler
-            </p>
+            <h2 class="dashboard-title">Departman Yöneticisi Genel Bakış</h2>
+            <p class="dashboard-subtitle">Onay sürecini, analist çıktılarını ve yazılım işlerinin durumunu izleyin.</p>
         </div>
-
-        <div class="card border-0 shadow-sm bg-white">
-            <div class="card-body px-4 py-3 text-center text-dark">
-                <div class="small text-secondary">
-                    Onay Bekleyen
-                </div>
-
-                <div class="fs-3 fw-bold text-dark">
-                    @requests.Count
-                </div>
-            </div>
-        </div>
+        <a asp-controller="DepartmentManager"
+           asp-action="ApprovedRequests"
+           class="btn btn-outline-primary">Onaylanan Talepler ve Excel</a>
     </div>
 
     @if (TempData["SuccessMessage"] != null)
     {
-        <div class="alert alert-success alert-dismissible fade show"
-             role="alert">
-            @TempData["SuccessMessage"]
-
-            <button type="button"
-                    class="btn-close"
-                    data-bs-dismiss="alert"
-                    aria-label="Kapat">
-            </button>
-        </div>
+        <div class="alert alert-success">@TempData["SuccessMessage"]</div>
     }
-
     @if (TempData["ErrorMessage"] != null)
     {
-        <div class="alert alert-danger alert-dismissible fade show"
-             role="alert">
-            @TempData["ErrorMessage"]
-
-            <button type="button"
-                    class="btn-close"
-                    data-bs-dismiss="alert"
-                    aria-label="Kapat">
-            </button>
-        </div>
+        <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
     }
 
-    <div class="card border-0 shadow-sm bg-white">
-        <div class="card-header bg-white border-bottom py-3">
-            <h5 class="mb-0 text-dark">
-                Onay Bekleyen Talepler
-            </h5>
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="stat-card">
+                <div class="stat-label">Toplam Talepler</div>
+                <div class="stat-value">@totalCount</div>
+                <div class="stat-footer-text">Mevcut yönetici iş kuyruğu</div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="stat-card">
+                <div class="stat-label">Onay Bekleyenler</div>
+                <div class="stat-value">@pendingApprovalCount</div>
+                <div class="stat-footer-text">Karar verilmesi gereken talepler</div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="stat-card">
+                <div class="stat-label">Devam Eden Yazılım İşleri</div>
+                <div class="stat-value">@inProgressDeveloperCount</div>
+                <div class="stat-footer-text">Atama verisi sağlandığında güncellenecek</div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="stat-card">
+                <div class="stat-label">Geciken İşler</div>
+                <div class="stat-value text-danger">@overdueCount</div>
+                <div class="stat-footer-text">Deadline verisi sağlandığında güncellenecek</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-12 col-xl-8">
+            <section class="modern-card h-100">
+                <div class="modern-card-header">
+                    <div>
+                        <h3 class="modern-card-title">Son Analist Raporları</h3>
+                        <p class="dashboard-section-note">Yönetici onayına en son gönderilen talepler</p>
+                    </div>
+                </div>
+
+                @if (!recentReports.Any())
+                {
+                    <div class="empty-state">
+                        <h4 class="empty-state-title">Onay bekleyen rapor bulunmuyor</h4>
+                        <p class="empty-state-description">Analist raporları gönderildiğinde burada listelenecektir.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table modern-table align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Talep No</th>
+                                    <th>Açıklama</th>
+                                    <th>Departman</th>
+                                    <th>Güncellenme</th>
+                                    <th class="text-end">İşlem</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in recentReports)
+                                {
+                                    var displayedDate = item.UpdatedAt ?? item.CreatedAt;
+
+                                    <tr>
+                                        <td class="fw-semibold">@item.RequestNumber</td>
+                                        <td class="dashboard-description-cell">@item.RequestDescription</td>
+                                        <td>@item.Department</td>
+                                        <td class="text-nowrap">@displayedDate.ToLocalTime().ToString("dd.MM.yyyy")</td>
+                                        <td class="text-end">
+                                            <a asp-controller="DepartmentManager"
+                                               asp-action="Review"
+                                               asp-route-id="@item.Id"
+                                               class="btn btn-sm btn-primary">İncele</a>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </section>
         </div>
 
-        <div class="card-body p-0 text-dark">
-
-            @if (!requests.Any())
-            {
-                <div class="text-center py-5 text-dark">
-                    <h5 class="text-dark">
-                        Onay bekleyen talep bulunmuyor
-                    </h5>
-
-                    <p class="text-secondary mb-0">
-                        Analist tarafından gönderilen talepler burada görüntülenecek.
+        <div class="col-12 col-xl-4">
+            <section class="modern-card h-100">
+                <div class="modern-card-header">
+                    <div>
+                        <h3 class="modern-card-title">Yazılımcı İş Durumu</h3>
+                        <p class="dashboard-section-note">Atama ve ilerleme özeti</p>
+                    </div>
+                </div>
+                <div class="p-4">
+                    <div class="dashboard-summary-row">
+                        <span>Atanan işler</span>
+                        <strong>0</strong>
+                    </div>
+                    <div class="dashboard-summary-row">
+                        <span>Devam eden işler</span>
+                        <strong>0</strong>
+                    </div>
+                    <div class="dashboard-summary-row">
+                        <span>Tamamlanan işler</span>
+                        <strong>0</strong>
+                    </div>
+                    <p class="dashboard-section-note mt-3 mb-0">
+                        Yazılımcı atama verileri mevcut dashboard modeline eklendiğinde bu özet otomatik veriye bağlanabilir.
                     </p>
                 </div>
-            }
-            else
-            {
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0 text-dark">
-                        <thead class="table-light text-dark">
-                            <tr>
-                                <th class="px-4 py-3 text-dark">Talep No</th>
-                                <th class="py-3 text-dark">Talep</th>
-                                <th class="py-3 text-dark">Departman</th>
-                                <th class="py-3 text-dark">Öncelik</th>
-                                <th class="py-3 text-dark">Durum</th>
-                                <th class="py-3 text-dark">Güncellenme</th>
-                                <th class="px-4 py-3 text-end text-dark">
-                                    İşlem
-                                </th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-                            @foreach (var item in requests)
-                            {
-                                string priorityText = item.Priority switch
-                                {
-                                    RequestPriority.Low => "Düşük",
-                                    RequestPriority.Normal => "Normal",
-                                    RequestPriority.High => "Yüksek",
-                                    RequestPriority.Critical => "Kritik",
-                                    _ => item.Priority.ToString()
-                                };
-
-                                string priorityClass = item.Priority switch
-                                {
-                                    RequestPriority.Low =>
-                                    "bg-success text-white",
-
-                                    RequestPriority.Normal =>
-                                    "bg-primary text-white",
-
-                                    RequestPriority.High =>
-                                    "bg-warning text-dark",
-
-                                    RequestPriority.Critical =>
-                                    "bg-danger text-white",
-
-                                    _ =>
-                                    "bg-secondary text-white"
-                                };
-
-                                DateTime displayedDate =
-                                item.UpdatedAt ?? item.CreatedAt;
-
-                                <tr class="text-dark">
-                                    <td class="px-4 fw-semibold text-dark">
-                                        @item.RequestNumber
-                                    </td>
-
-                                    <td class="text-dark"
-                                        style="min-width: 250px;">
-                                        @item.RequestDescription
-                                    </td>
-
-                                    <td class="text-dark">
-                                        @item.Department
-                                    </td>
-
-                                    <td>
-                                        <span class="badge rounded-pill @priorityClass">
-                                            @priorityText
-                                        </span>
-                                    </td>
-
-                                    <td>
-                                        <span class="badge rounded-pill bg-warning text-dark">
-                                            Yönetici Onayı Bekliyor
-                                        </span>
-                                    </td>
-
-                                    <td class="text-nowrap text-dark">
-                                        @displayedDate.ToString("dd.MM.yyyy HH:mm")
-                                    </td>
-
-                                    <td class="px-4 text-end">
-                                        <a asp-controller="DepartmentManager"
-                                           asp-action="Review"
-                                           asp-route-id="@item.Id"
-                                           class="btn btn-primary btn-sm text-white text-nowrap">
-                                            Talebi İncele
-                                        </a>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            }
+            </section>
         </div>
     </div>
 </div>

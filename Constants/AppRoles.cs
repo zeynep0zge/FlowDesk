@@ -5,6 +5,7 @@
         public const string ProjectManager = "ProjectManager";
         public const string Analyst = "Analyst";
         public const string DepartmentManager = "DepartmentManager";
+        public const string Employee = "Employee";
 
         public static readonly string[] All =
         {

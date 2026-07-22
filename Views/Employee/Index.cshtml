@@ -1,0 +1,105 @@
+@model IEnumerable<FlowDesk.Models.WorkItem>
+@using FlowDesk.Models
+
+@{
+    ViewData["Title"] = "Yazılımcı Dashboard";
+
+    var assignedWorkItems = Model?.ToList() ?? new List<WorkItem>();
+    var assignedCount = assignedWorkItems.Count;
+    var inProgressCount = assignedWorkItems.Count(x => x.WorkflowStatus == WorkflowStatus.InProgress);
+    var upcomingDeadlineCount = assignedWorkItems.Count(x =>
+        x.BanksoftDeliveryDate.HasValue &&
+        x.BanksoftDeliveryDate.Value.Date >= DateTime.Today &&
+        x.BanksoftDeliveryDate.Value.Date <= DateTime.Today.AddDays(7));
+    var completedCount = assignedWorkItems.Count(x => x.WorkflowStatus == WorkflowStatus.Completed);
+    var recentWorkItems = assignedWorkItems
+        .OrderByDescending(x => x.UpdatedAt ?? x.CreatedAt)
+        .Take(6)
+        .ToList();
+}
+
+<div class="container-fluid p-0">
+    <div class="mb-4">
+        <h2 class="dashboard-title">Yazılımcı</h2>
+        <p class="dashboard-subtitle">Size atanan işleri ve yaklaşan teslim tarihlerini takip edin.</p>
+    </div>
+
+    <nav class="row g-3 mb-4" aria-label="Yazılımcı işlemleri">
+        <div class="col-12 col-md-6 col-xl-3">
+            <a asp-controller="Employee" asp-action="Index" class="dashboard-nav-card">
+                <span class="dashboard-nav-title">Bana Atanan İşler</span>
+                <strong class="dashboard-nav-count">@assignedCount</strong>
+                <span class="dashboard-nav-description">Yalnızca size atanmış işler.</span>
+            </a>
+        </div>
+
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="dashboard-nav-card dashboard-nav-card-disabled" aria-disabled="true">
+                <span class="dashboard-nav-title">Devam Eden İşler</span>
+                <strong class="dashboard-nav-count">@inProgressCount</strong>
+                <span class="dashboard-nav-description">Ayrı liste ekranı henüz bulunmuyor.</span>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="dashboard-nav-card dashboard-nav-card-disabled" aria-disabled="true">
+                <span class="dashboard-nav-title">Yaklaşan Deadline’lar</span>
+                <strong class="dashboard-nav-count">@upcomingDeadlineCount</strong>
+                <span class="dashboard-nav-description">Ayrı liste ekranı henüz bulunmuyor.</span>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="dashboard-nav-card dashboard-nav-card-disabled" aria-disabled="true">
+                <span class="dashboard-nav-title">Tamamlanan İşler</span>
+                <strong class="dashboard-nav-count">@completedCount</strong>
+                <span class="dashboard-nav-description">Ayrı liste ekranı henüz bulunmuyor.</span>
+            </div>
+        </div>
+    </nav>
+
+    <section class="modern-card">
+        <div class="modern-card-header">
+            <div>
+                <h3 class="modern-card-title">Bana Atanan Son İşler</h3>
+                <p class="dashboard-section-note">Başka yazılımcıların işleri bu alanda gösterilmez</p>
+            </div>
+        </div>
+
+        @if (!recentWorkItems.Any())
+        {
+            <div class="empty-state">
+                <h4 class="empty-state-title">Henüz size atanmış bir iş bulunmuyor.</h4>
+                <p class="empty-state-description">
+                    Size yeni bir iş atandığında burada görüntülenecektir.
+                </p>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table modern-table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Talep No</th>
+                            <th>İş</th>
+                            <th>Durum</th>
+                            <th>Deadline</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in recentWorkItems)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@item.RequestNumber</td>
+                                <td class="dashboard-description-cell">@item.RequestDescription</td>
+                                <td>@item.CurrentStatus</td>
+                                <td>@(item.BanksoftDeliveryDate?.ToString("dd.MM.yyyy") ?? "Belirlenmedi")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+</div>
