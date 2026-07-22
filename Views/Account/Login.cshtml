@@ -1,0 +1,109 @@
+﻿@model FlowDesk.ViewModels.Account.LoginViewModel
+
+@{
+    Layout = null;
+    ViewData["Title"] = "Giriş Yap";
+}
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0" />
+
+    <title>FlowDesk | Giriş Yap</title>
+
+    <link rel="stylesheet"
+          href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+
+    <link rel="stylesheet"
+          href="~/css/login.css"
+          asp-append-version="true" />
+</head>
+
+<body>
+    <main class="login-page">
+        <section class="login-card">
+
+            <div class="login-brand">
+                <div class="brand-icon">F</div>
+
+                <div>
+                    <h1>FlowDesk</h1>
+                    <p>Talep ve iş akışı yönetimi</p>
+                </div>
+            </div>
+
+            <div class="login-header">
+                <h2>Hoş geldiniz</h2>
+                <p>Devam etmek için hesabınıza giriş yapın.</p>
+            </div>
+
+            <form asp-controller="Account"
+                  asp-action="Login"
+                  method="post">
+
+                <input asp-for="ReturnUrl" type="hidden" />
+
+                <div asp-validation-summary="ModelOnly"
+                     class="alert alert-danger">
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="Email"
+                           class="form-label">
+                    </label>
+
+                    <input asp-for="Email"
+                           class="form-control"
+                           placeholder="ornek@flowdesk.local"
+                           autocomplete="email" />
+
+                    <span asp-validation-for="Email"
+                          class="text-danger">
+                    </span>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="Password"
+                           class="form-label">
+                    </label>
+
+                    <input asp-for="Password"
+                           class="form-control"
+                           placeholder="Şifrenizi girin"
+                           autocomplete="current-password" />
+
+                    <span asp-validation-for="Password"
+                          class="text-danger">
+                    </span>
+                </div>
+
+                <div class="form-check mb-4">
+                    <input asp-for="RememberMe"
+                           class="form-check-input" />
+
+                    <label asp-for="RememberMe"
+                           class="form-check-label">
+                    </label>
+                </div>
+
+                <button type="submit"
+                        class="btn btn-primary login-button">
+                    Giriş Yap
+                </button>
+            </form>
+
+            <div class="login-footer">
+                © @DateTime.Now.Year FlowDesk
+            </div>
+
+        </section>
+    </main>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>
+    <script src="~/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.min.js"></script>
+</body>
+</html>

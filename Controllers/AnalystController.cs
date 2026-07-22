@@ -1,10 +1,13 @@
+using FlowDesk.Constants;
 using FlowDesk.DTOs.Analyst;
 using FlowDesk.Services.Interfaces;
 using FlowDesk.ViewModels.Analyst;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FlowDesk.Controllers
 {
+    [Authorize(Roles = AppRoles.Analyst)]
     public class AnalystController : Controller
     {
         private readonly IAnalystWorkflowService
