@@ -1,9 +1,12 @@
-﻿using FlowDesk.DTOs.DepartmentManager;
+﻿using FlowDesk.Constants;
+using FlowDesk.DTOs.DepartmentManager;
 using FlowDesk.Services.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FlowDesk.Controllers
 {
+    [Authorize(Roles = AppRoles.DepartmentManager)]
     [ResponseCache(
         Duration = 0,
         Location = ResponseCacheLocation.None,

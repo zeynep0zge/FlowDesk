@@ -1,13 +1,16 @@
+using FlowDesk.Common;
+using FlowDesk.Constants;
+using FlowDesk.Data;
+using FlowDesk.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Security.Claims;
-using FlowDesk.Common;
-using FlowDesk.Data;
-using FlowDesk.Models;
 
 namespace FlowDesk.Controllers
 {
+    [Authorize(Roles = AppRoles.ProjectManager)]
     public class ProjectManagerController : Controller
     {
         private readonly AppDbContext _context;
