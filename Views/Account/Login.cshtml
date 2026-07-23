@@ -79,6 +79,12 @@
                           class="text-danger">
                     </span>
                 </div>
+                <div class="text-end mb-3">
+                    <a asp-controller="Account"
+                       asp-action="ForgotPassword">
+                        Şifremi unuttum
+                    </a>
+                </div>
 
                 <div class="form-check mb-4">
                     <input asp-for="RememberMe"
@@ -94,6 +100,11 @@
                     Giriş Yap
                 </button>
             </form>
+
+            <div class="auth-secondary-action">
+                Hesabınız yok mu?
+                <a asp-controller="Account" asp-action="Register">Hesap oluşturun</a>
+            </div>
 
             <div class="login-footer">
                 © @DateTime.Now.Year FlowDesk

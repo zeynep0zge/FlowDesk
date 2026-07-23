@@ -142,6 +142,11 @@ body {
     min-width: 0; /* Prevents overflow inside flex container */
 }
 
+.app-content-wrapper.no-sidebar {
+    width: 100%;
+    margin-left: 0;
+}
+
 /* Top bar Header */
 .app-header {
     background-color: #ffffff;
@@ -156,7 +161,45 @@ body {
 .header-title-area {
     display: flex;
     align-items: center;
+    gap: 1rem;
+    min-width: 0;
+}
+
+.header-brand {
+    display: inline-flex;
+    align-items: center;
     gap: 0.5rem;
+    color: var(--primary-navy);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-decoration: none;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.header-brand:hover {
+    color: var(--primary-navy-dark);
+}
+
+.header-home-link {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.header-home-link:hover {
+    color: var(--primary-navy);
+}
+
+.header-page-title {
+    padding-left: 1rem;
+    border-left: 1px solid var(--border-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .header-user-area {
@@ -179,6 +222,20 @@ body {
     font-size: 0.9rem;
     font-weight: 600;
     color: var(--text-dark);
+}
+
+.user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-color: var(--primary-navy);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 0.85rem;
+    font-weight: 700;
 }
 
 .user-role {
@@ -617,6 +674,22 @@ body {
     
     .app-header {
         padding: 0.75rem 1.25rem;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+
+    .header-brand,
+    .header-page-title {
+        display: none;
+    }
+
+    .header-title-area {
+        flex: 1 1 auto;
+    }
+
+    .header-user-area {
+        flex-wrap: wrap;
+        justify-content: flex-end;
     }
     
     .app-body {

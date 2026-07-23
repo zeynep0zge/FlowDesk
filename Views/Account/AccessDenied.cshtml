@@ -1,0 +1,41 @@
+@using FlowDesk.Constants
+
+@{
+    ViewData["Title"] = "Erişim Reddedildi";
+
+    string dashboardController =
+        User.IsInRole(AppRoles.ProjectManager) ? "ProjectManager" :
+        User.IsInRole(AppRoles.Analyst) ? "Analyst" :
+        User.IsInRole(AppRoles.DepartmentManager) ? "DepartmentManager" :
+        User.IsInRole(AppRoles.Employee) ? "Employee" :
+        User.Identity?.IsAuthenticated == true ? "Home" : "Account";
+
+    string dashboardAction =
+        User.Identity?.IsAuthenticated == true ? "Index" : "Login";
+}
+
+<div class="container-fluid p-0">
+    <div class="d-flex align-items-center justify-content-center py-5">
+        <section class="modern-card text-center w-100" style="max-width: 640px;" aria-labelledby="access-denied-title">
+            <div class="p-4 p-md-5">
+                <div class="d-inline-flex align-items-center justify-content-center rounded-circle mb-4"
+                     style="width: 72px; height: 72px; color: #b91c1c; background: #fef2f2;" aria-hidden="true">
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                </div>
+
+                <h1 id="access-denied-title" class="h3 fw-bold mb-3" style="color: var(--primary-navy);">
+                    Erişim Reddedildi
+                </h1>
+                <p class="text-muted mb-4">
+                    Bu sayfaya erişim yetkiniz bulunmamaktadır.
+                </p>
+                <a asp-controller="@dashboardController" asp-action="@dashboardAction" class="btn btn-primary">
+                    Kendi ana sayfama dön
+                </a>
+            </div>
+        </section>
+    </div>
+</div>
