@@ -6,7 +6,7 @@ using FlowDesk.Services;
 using FlowDesk.Services.Interfaces;
 using FlowDesk.Models;
 using Microsoft.AspNetCore.Identity;
-
+using FlowDesk.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,6 +41,10 @@ builder.Services
     .AddEntityFrameworkStores<AppDbContext>()
     .AddDefaultTokenProviders();
 
+builder.Services.Configure<EmailSettings>(
+    builder.Configuration.GetSection("EmailSettings"));
+
+builder.Services.AddScoped<IEmailService, BrevoEmailService>();
 builder.Services.ConfigureApplicationCookie(options =>
 {
     options.LoginPath = "/Account/Login";
@@ -93,5 +97,38 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Account}/{action=Login}/{id?}"
 );
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapGet(
+        "/dev/send-test-email",
+        async (
+            IEmailService emailService,
+            IConfiguration configuration) =>
+        {
+            var recipient =
+                configuration["EmailSettings:TestRecipient"];
+
+            if (string.IsNullOrWhiteSpace(recipient))
+            {
+                return Results.BadRequest(
+                    "TestRecipient ayarý bulunamadý.");
+            }
+
+            await emailService.SendAsync(
+                recipient,
+                "FlowDesk SMTP Testi",
+                """
+                <div style="font-family:Arial,sans-serif">
+                    <h2>FlowDesk</h2>
+                    <p>Brevo SMTP baðlantýsý baþarýyla çalýþýyor.</p>
+                </div>
+                """);
+
+            return Results.Ok(
+                "Test e-postasý gönderildi.");
+        })
+        .RequireAuthorization();
+}
 
 app.Run();
