@@ -1,0 +1,71 @@
+@model IReadOnlyList<FlowDesk.ViewModels.DepartmentManager.PendingUserViewModel>
+
+@{
+    ViewData["Title"] = "Hesap Onayları";
+}
+
+<div class="container-fluid p-0">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <h2 class="fw-bold mb-1" style="color: var(--primary-navy);">Hesap Onayları</h2>
+            <p class="text-muted mb-0">E-postasını doğrulayan kullanıcıların rol taleplerini inceleyin.</p>
+        </div>
+        <span class="badge bg-primary fs-6">@Model.Count bekleyen hesap</span>
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success">@TempData["SuccessMessage"]</div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+    }
+
+    <section class="modern-card">
+        @if (Model.Count == 0)
+        {
+            <div class="empty-state">
+                <h3 class="empty-state-title">Onay bekleyen hesap bulunmuyor</h3>
+                <p class="empty-state-description">Yeni doğrulanmış hesap talepleri burada görüntülenecek.</p>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table modern-table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Ad Soyad</th>
+                            <th>E-posta</th>
+                            <th>Departman</th>
+                            <th>Talep Edilen Rol</th>
+                            <th>Kayıt Tarihi</th>
+                            <th class="text-end">İşlem</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var user in Model)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@user.FullName</td>
+                                <td>@user.Email</td>
+                                <td>@user.Department</td>
+                                <td><span class="badge bg-light text-dark border">@user.RequestedRoleDisplayName</span></td>
+                                <td class="text-nowrap">@user.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                                <td class="text-end">
+                                    <form asp-controller="DepartmentManager"
+                                          asp-action="ApproveUser"
+                                          asp-route-id="@user.Id"
+                                          method="post">
+                                        <button type="submit" class="btn btn-primary btn-sm">Onayla</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+</div>

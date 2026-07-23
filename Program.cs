@@ -15,7 +15,7 @@ builder.Services.AddControllersWithViews();
 string connectionString =
     builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException(
-        "DefaultConnection baðlantý bilgisi bulunamadý."
+        "DefaultConnection baï¿½lantï¿½ bilgisi bulunamadï¿½."
     );
 
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -63,6 +63,14 @@ builder.Services.AddScoped<
     IExcelExportService,
     ExcelExportService>();
 
+builder.Services.AddScoped<
+    IPasswordHasher<PasswordResetRequest>,
+    PasswordHasher<PasswordResetRequest>>();
+
+builder.Services.AddScoped<
+    IPasswordHasher<EmailVerificationRequest>,
+    PasswordHasher<EmailVerificationRequest>>();
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
@@ -75,6 +83,7 @@ using (var scope = app.Services.CreateScope())
         await IdentitySeeder.SeedTestUsersAsync(
             scope.ServiceProvider);
     }
+
 }
 
 // HTTP request pipeline
@@ -112,7 +121,7 @@ if (app.Environment.IsDevelopment())
             if (string.IsNullOrWhiteSpace(recipient))
             {
                 return Results.BadRequest(
-                    "TestRecipient ayarý bulunamadý.");
+                    "TestRecipient ayarï¿½ bulunamadï¿½.");
             }
 
             await emailService.SendAsync(
@@ -121,12 +130,12 @@ if (app.Environment.IsDevelopment())
                 """
                 <div style="font-family:Arial,sans-serif">
                     <h2>FlowDesk</h2>
-                    <p>Brevo SMTP baðlantýsý baþarýyla çalýþýyor.</p>
+                    <p>Brevo SMTP baï¿½lantï¿½sï¿½ baï¿½arï¿½yla ï¿½alï¿½ï¿½ï¿½yor.</p>
                 </div>
                 """);
 
             return Results.Ok(
-                "Test e-postasý gönderildi.");
+                "Test e-postasï¿½ gï¿½nderildi.");
         })
         .RequireAuthorization();
 }

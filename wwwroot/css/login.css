@@ -121,3 +121,51 @@ body {
         padding: 28px 22px;
     }
 }
+
+
+.form-select {
+    min-height: 48px;
+    border-color: #cbd5e1;
+    border-radius: 10px;
+}
+
+.form-select:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+}
+
+.auth-card-wide {
+    max-width: 720px;
+}
+
+.auth-secondary-action {
+    margin-top: 20px;
+    color: #64748b;
+    text-align: center;
+    font-size: 14px;
+}
+
+.auth-secondary-action a {
+    font-weight: 600;
+}
+
+.verification-code-input {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 8px;
+    text-align: center;
+}
+
+.status-icon {
+    width: 72px;
+    height: 72px;
+    margin: 0 auto 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: #ecfdf5;
+    color: #047857;
+    font-size: 34px;
+    font-weight: 700;
+}

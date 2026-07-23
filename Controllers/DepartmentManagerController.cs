@@ -1,8 +1,12 @@
 ﻿using FlowDesk.Constants;
 using FlowDesk.DTOs.DepartmentManager;
+using FlowDesk.Models;
+using FlowDesk.ViewModels.DepartmentManager;
 using FlowDesk.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace FlowDesk.Controllers
 {
@@ -17,16 +21,19 @@ namespace FlowDesk.Controllers
             _departmentManagerWorkflowService;
 
         private readonly IExcelExportService _excelExportService;
+        private readonly UserManager<ApplicationUser> _userManager;
 
         public DepartmentManagerController(
 
             IDepartmentManagerWorkflowService departmentManagerWorkflowService,
-            IExcelExportService excelExportService)
+            IExcelExportService excelExportService,
+            UserManager<ApplicationUser> userManager)
         {
             _departmentManagerWorkflowService =
                 departmentManagerWorkflowService;
 
             _excelExportService = excelExportService;
+            _userManager = userManager;
         }
 
 
@@ -197,6 +204,98 @@ namespace FlowDesk.Controllers
             }
 
             return View(result.Data);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> PendingUsers()
+        {
+            var pendingUsers = await _userManager.Users
+                .AsNoTracking()
+                .Where(user =>
+                    user.EmailConfirmed &&
+                    !user.IsApproved &&
+                    user.RequestedRole != null &&
+                    user.RequestedRole != string.Empty)
+                .OrderBy(user => user.CreatedAtUtc)
+                .Select(user => new PendingUserViewModel
+                {
+                    Id = user.Id,
+                    FullName = user.FullName,
+                    Email = user.Email ?? string.Empty,
+                    Department = user.Department ?? string.Empty,
+                    RequestedRole = user.RequestedRole ?? string.Empty,
+                    CreatedAtUtc = user.CreatedAtUtc
+                })
+                .ToListAsync();
+
+            return View(pendingUsers);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ApproveUser(int id)
+        {
+            var user = await _userManager.FindByIdAsync(id.ToString());
+
+            if (user == null)
+            {
+                TempData["ErrorMessage"] = "Kullanıcı bulunamadı.";
+                return RedirectToAction(nameof(PendingUsers));
+            }
+
+            if (user.IsApproved)
+            {
+                TempData["SuccessMessage"] =
+                    "Bu kullanıcı daha önce onaylanmış.";
+
+                return RedirectToAction(nameof(PendingUsers));
+            }
+
+            if (!user.EmailConfirmed ||
+                !AppRoles.IsSelfRegistrable(user.RequestedRole))
+            {
+                TempData["ErrorMessage"] =
+                    "Kullanıcının e-posta veya rol talebi onay için uygun değil.";
+
+                return RedirectToAction(nameof(PendingUsers));
+            }
+
+            bool alreadyInRole = await _userManager.IsInRoleAsync(
+                user,
+                user.RequestedRole!);
+
+            if (!alreadyInRole)
+            {
+                var roleResult = await _userManager.AddToRoleAsync(
+                    user,
+                    user.RequestedRole!);
+
+                if (!roleResult.Succeeded)
+                {
+                    TempData["ErrorMessage"] = string.Join(
+                        " ",
+                        roleResult.Errors.Select(error => error.Description));
+
+                    return RedirectToAction(nameof(PendingUsers));
+                }
+            }
+
+            user.IsApproved = true;
+            var updateResult = await _userManager.UpdateAsync(user);
+
+            if (!updateResult.Succeeded)
+            {
+                TempData["ErrorMessage"] = string.Join(
+                    " ",
+                    updateResult.Errors.Select(error => error.Description));
+
+                return RedirectToAction(nameof(PendingUsers));
+            }
+
+            TempData["SuccessMessage"] =
+                "Kullanıcı hesabı onaylandı ve talep edilen rol atandı.";
+
+            return RedirectToAction(nameof(PendingUsers));
         }
 
     }

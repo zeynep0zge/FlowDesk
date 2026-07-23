@@ -1,0 +1,44 @@
+@{
+    Layout = null;
+    ViewData["Title"] = "Onay Bekleniyor";
+}
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FlowDesk | Onay Bekleniyor</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/login.css" asp-append-version="true" />
+</head>
+<body>
+    <main class="login-page">
+        <section class="login-card text-center">
+            <div class="login-brand justify-content-center">
+                <div class="brand-icon">F</div>
+                <div class="text-start">
+                    <h1>FlowDesk</h1>
+                    <p>Talep ve iş akışı yönetimi</p>
+                </div>
+            </div>
+
+            <div class="status-icon" aria-hidden="true">✓</div>
+
+            <div class="login-header">
+                <h2>E-postanız doğrulandı</h2>
+                <p>Hesabınız departman yöneticisi onayı bekliyor. Hesabınız onaylandıktan sonra giriş yapabilirsiniz.</p>
+            </div>
+
+            @if (TempData["Success"] != null)
+            {
+                <div class="alert alert-success">@TempData["Success"]</div>
+            }
+
+            <a asp-controller="Account" asp-action="Login" class="btn btn-primary login-button">
+                Giriş sayfasına dön
+            </a>
+        </section>
+    </main>
+</body>
+</html>

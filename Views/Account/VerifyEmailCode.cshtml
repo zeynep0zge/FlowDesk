@@ -1,0 +1,83 @@
+@model FlowDesk.ViewModels.Account.VerifyEmailCodeViewModel
+
+@{
+    Layout = null;
+    ViewData["Title"] = "E-postayı Doğrula";
+}
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FlowDesk | E-postayı Doğrula</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/login.css" asp-append-version="true" />
+</head>
+<body>
+    <main class="login-page">
+        <section class="login-card">
+            <div class="login-brand">
+                <div class="brand-icon">F</div>
+                <div>
+                    <h1>FlowDesk</h1>
+                    <p>Talep ve iş akışı yönetimi</p>
+                </div>
+            </div>
+
+            <div class="login-header">
+                <h2>E-postanızı doğrulayın</h2>
+                <p><strong>@Model.Email</strong> adresine gönderilen 6 haneli kodu girin.</p>
+            </div>
+
+            @if (TempData["Info"] != null)
+            {
+                <div class="alert alert-info">@TempData["Info"]</div>
+            }
+            @if (TempData["ErrorMessage"] != null)
+            {
+                <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+            }
+
+            <form asp-controller="Account" asp-action="VerifyEmailCode" method="post">
+                <input asp-for="Email" type="hidden" />
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+                <div class="mb-4">
+                    <label asp-for="Code" class="form-label"></label>
+                    <input asp-for="Code"
+                           class="form-control verification-code-input"
+                           placeholder="000000"
+                           maxlength="6"
+                           inputmode="numeric"
+                           pattern="[0-9]{6}"
+                           autocomplete="one-time-code" />
+                    <span asp-validation-for="Code" class="text-danger"></span>
+                </div>
+
+                <button type="submit" class="btn btn-primary login-button">
+                    E-postayı Doğrula
+                </button>
+            </form>
+
+            <form asp-controller="Account"
+                  asp-action="ResendEmailVerificationCode"
+                  method="post"
+                  class="mt-3">
+                <input name="email" value="@Model.Email" type="hidden" />
+                <button type="submit" class="btn btn-outline-primary w-100">
+                    Kodu yeniden gönder
+                </button>
+            </form>
+
+            <div class="auth-secondary-action">
+                <a asp-controller="Account" asp-action="Login">Giriş sayfasına dön</a>
+            </div>
+        </section>
+    </main>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>
+    <script src="~/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.min.js"></script>
+</body>
+</html>
