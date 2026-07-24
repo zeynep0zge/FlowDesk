@@ -57,6 +57,10 @@ builder.Services.AddScoped<
     IProjectManagerWorkItemService,
     ProjectManagerWorkItemService>();
 
+builder.Services.AddScoped<
+    IAccountApprovalService,
+    AccountApprovalService>();
+
 builder.Services.AddScoped<IAnalystWorkflowService, AnalystWorkflowService>();
 
 builder.Services.AddScoped<

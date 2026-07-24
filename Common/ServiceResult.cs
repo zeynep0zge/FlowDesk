@@ -10,11 +10,22 @@ public class ServiceResult
 
     public string? ErrorMessage { get; init; }
 
+    public string? SuccessMessage { get; init; }
+
     public static ServiceResult Success()
     {
         return new ServiceResult
         {
             IsSuccess = true
+        };
+    }
+
+    public static ServiceResult Success(string successMessage)
+    {
+        return new ServiceResult
+        {
+            IsSuccess = true,
+            SuccessMessage = successMessage
         };
     }
 
