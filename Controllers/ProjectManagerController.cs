@@ -28,10 +28,7 @@ namespace FlowDesk.Controllers
                 .AsNoTracking()
                 .OrderByDescending(x => x.CreatedAt);
 
-            /*
-             * Kullanıcı giriş sistemi eklendiğinde sadece giriş yapan
-             * proje yöneticisinin talepleri gösterilecek.
-             */
+            // Kullanıcı kimliği mevcutsa listeyi giriş yapan proje yöneticisiyle sınırlar.
 
             int? currentUserId = GetCurrentUserId();
 
@@ -100,7 +97,7 @@ namespace FlowDesk.Controllers
 
             workItem.Department = workItem.Department.Trim();
 
-            // Kullanıcı giriş sistemi varsa kullanıcı ID'si alınır.
+            // Talep, giriş yapan kullanıcının kimliğiyle ilişkilendirilir.
             workItem.CreatedByUserId = GetCurrentUserId();
 
             // Sistem tarafından başlangıç değerleri atanır.
@@ -347,7 +344,7 @@ namespace FlowDesk.Controllers
                 return userId;
             }
 
-            // Login sistemi henüz yapılmadıysa null döner.
+            // Geçerli bir kullanıcı kimliği claim'i yoksa null döner.
             return null;
         }
 

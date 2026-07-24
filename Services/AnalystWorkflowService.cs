@@ -1,4 +1,4 @@
-﻿using FlowDesk.Common;
+using FlowDesk.Common;
 using FlowDesk.DTOs.Analyst;
 using FlowDesk.Models;
 using FlowDesk.Repositories.Interfaces;
@@ -6,7 +6,7 @@ using FlowDesk.Services.Interfaces;
 using FlowDesk.ViewModels.Analyst;
 using FlowDesk.ViewModels.DepartmentManager;
 
-namespace FlowDesk.Services.Interfaces
+namespace FlowDesk.Services
 {
     public class AnalystWorkflowService : IAnalystWorkflowService
     {

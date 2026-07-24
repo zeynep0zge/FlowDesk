@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
-using FlowDesk.Models;
+using FlowDesk.ViewModels;
 
 namespace FlowDesk.Controllers
 {

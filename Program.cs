@@ -15,7 +15,7 @@ builder.Services.AddControllersWithViews();
 string connectionString =
     builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException(
-        "DefaultConnection ba�lant� bilgisi bulunamad�."
+        "DefaultConnection bağlantı bilgisi bulunamadı."
     );
 
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -121,7 +121,7 @@ if (app.Environment.IsDevelopment())
             if (string.IsNullOrWhiteSpace(recipient))
             {
                 return Results.BadRequest(
-                    "TestRecipient ayar� bulunamad�.");
+                    "TestRecipient ayarı bulunamadı.");
             }
 
             await emailService.SendAsync(
@@ -130,12 +130,12 @@ if (app.Environment.IsDevelopment())
                 """
                 <div style="font-family:Arial,sans-serif">
                     <h2>FlowDesk</h2>
-                    <p>Brevo SMTP ba�lant�s� ba�ar�yla �al���yor.</p>
+                    <p>Brevo SMTP bağlantısı başarıyla çalışıyor.</p>
                 </div>
                 """);
 
             return Results.Ok(
-                "Test e-postas� g�nderildi.");
+                "Test e-postası gönderildi.");
         })
         .RequireAuthorization();
 }
