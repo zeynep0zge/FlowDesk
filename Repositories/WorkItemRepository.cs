@@ -1,4 +1,4 @@
-﻿using FlowDesk.Data;
+using FlowDesk.Data;
 using FlowDesk.Models;
 using FlowDesk.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +12,44 @@ namespace FlowDesk.Repositories
         public WorkItemRepository(AppDbContext context)
         {
             _context = context;
+        }
+
+        public async Task<List<WorkItem>>
+            GetProjectManagerRequestsAsync(int? currentUserId)
+        {
+            IQueryable<WorkItem> query = _context.WorkItems
+                .AsNoTracking()
+                .OrderByDescending(x => x.CreatedAt);
+
+            if (currentUserId.HasValue)
+            {
+                query = query.Where(
+                    x => x.CreatedByUserId == currentUserId.Value
+                );
+            }
+
+            return await query.ToListAsync();
+        }
+
+        public async Task<bool> RequestNumberExistsAsync(
+            string requestNumber,
+            int? excludedWorkItemId = null)
+        {
+            return await _context.WorkItems.AnyAsync(
+                x => x.RequestNumber == requestNumber &&
+                     (!excludedWorkItemId.HasValue ||
+                      x.Id != excludedWorkItemId.Value)
+            );
+        }
+
+        public void Add(WorkItem workItem)
+        {
+            _context.WorkItems.Add(workItem);
+        }
+
+        public void Remove(WorkItem workItem)
+        {
+            _context.WorkItems.Remove(workItem);
         }
 
         public async Task<List<WorkItem>> GetAnalystInboxAsync()

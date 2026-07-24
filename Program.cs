@@ -53,6 +53,10 @@ builder.Services.ConfigureApplicationCookie(options =>
 
 builder.Services.AddScoped<IWorkItemRepository, WorkItemRepository>();
 
+builder.Services.AddScoped<
+    IProjectManagerWorkItemService,
+    ProjectManagerWorkItemService>();
+
 builder.Services.AddScoped<IAnalystWorkflowService, AnalystWorkflowService>();
 
 builder.Services.AddScoped<
