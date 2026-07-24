@@ -1,4 +1,4 @@
-namespace FlowDesk.Models
+namespace FlowDesk.ViewModels
 {
     public class ErrorViewModel
     {
