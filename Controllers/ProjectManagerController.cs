@@ -1,11 +1,9 @@
 using FlowDesk.Common;
 using FlowDesk.Constants;
-using FlowDesk.Data;
 using FlowDesk.Models;
+using FlowDesk.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using System;
 using System.Security.Claims;
 
 namespace FlowDesk.Controllers
@@ -13,35 +11,24 @@ namespace FlowDesk.Controllers
     [Authorize(Roles = AppRoles.ProjectManager)]
     public class ProjectManagerController : Controller
     {
-        private readonly AppDbContext _context;
+        private readonly IProjectManagerWorkItemService
+            _workItemService;
 
-        public ProjectManagerController(AppDbContext context)
+        public ProjectManagerController(
+            IProjectManagerWorkItemService workItemService)
         {
-            _context = context;
+            _workItemService = workItemService;
         }
 
         // Proje yöneticisinin oluşturduğu talepleri listeler.
         [HttpGet]
         public async Task<IActionResult> Index()
         {
-            IQueryable<WorkItem> query = _context.WorkItems
-                .AsNoTracking()
-                .OrderByDescending(x => x.CreatedAt);
+            ServiceResult<List<WorkItem>> result =
+                await _workItemService.GetMyRequestsAsync(
+                    GetCurrentUserId());
 
-            // Kullanıcı kimliği mevcutsa listeyi giriş yapan proje yöneticisiyle sınırlar.
-
-            int? currentUserId = GetCurrentUserId();
-
-            if (currentUserId.HasValue)
-            {
-                query = query.Where(
-                    x => x.CreatedByUserId == currentUserId.Value
-                );
-            }
-
-            List<WorkItem> workItems = await query.ToListAsync();
-
-            return View(workItems);
+            return View(result.Data!);
         }
 
         // Yeni talep oluşturma sayfasını açar.
@@ -67,19 +54,15 @@ namespace FlowDesk.Controllers
             WorkItem workItem
         )
         {
-            string normalizedRequestNumber =
-                workItem.RequestNumber.Trim();
+            ServiceResult<string> validationResult =
+                await _workItemService.ValidateCreateAsync(
+                    workItem.RequestNumber);
 
-            bool requestNumberExists =
-                await _context.WorkItems.AnyAsync(
-                    x => x.RequestNumber == normalizedRequestNumber
-                );
-
-            if (requestNumberExists)
+            if (!validationResult.IsSuccess)
             {
                 ModelState.AddModelError(
                     nameof(workItem.RequestNumber),
-                    "Bu talep numarası daha önce kullanılmış."
+                    validationResult.ErrorMessage!
                 );
             }
 
@@ -90,40 +73,20 @@ namespace FlowDesk.Controllers
                 return View(workItem);
             }
 
-            // Proje yöneticisinin girdiği bilgiler
-            workItem.RequestNumber = normalizedRequestNumber;
-            workItem.RequestDescription =
-                workItem.RequestDescription.Trim();
+            ServiceResult createResult =
+                await _workItemService.CreateAsync(
+                    workItem,
+                    validationResult.Data!,
+                    GetCurrentUserId());
 
-            workItem.Department = workItem.Department.Trim();
-
-            // Talep, giriş yapan kullanıcının kimliğiyle ilişkilendirilir.
-            workItem.CreatedByUserId = GetCurrentUserId();
-
-            // Sistem tarafından başlangıç değerleri atanır.
-            workItem.WorkflowStatus = WorkflowStatus.Submitted;
-            workItem.CurrentStatus =
-                "Analist İncelemesi Bekliyor";
-
-            workItem.CreatedAt = DateTime.UtcNow;
-            workItem.UpdatedAt = null;
-            workItem.ApprovedAt = null;
-
-            // Henüz analist ve yazılımcı atanmamıştır.
-            workItem.AnalystId = null;
-            workItem.DeveloperId = null;
-
-            // Bu alanlar analist tarafından doldurulacaktır.
-            workItem.ReleaseDate = null;
-            workItem.BanksoftDeliveryDate = null;
-            workItem.ExpectedStatus = null;
-            workItem.AnalystNote = null;
-
-            // Bu alan yönetici kontrolünde doldurulacaktır.
-            workItem.ManagerNote = null;
-
-            _context.WorkItems.Add(workItem);
-            await _context.SaveChangesAsync();
+            if (!createResult.IsSuccess)
+            {
+                ModelState.AddModelError(
+                    string.Empty,
+                    createResult.ErrorMessage!
+                );
+                return View(workItem);
+            }
 
             TempData["SuccessMessage"] =
                 "Talep başarıyla oluşturuldu ve analist incelemesine gönderildi.";
@@ -135,62 +98,34 @@ namespace FlowDesk.Controllers
         [HttpGet]
         public async Task<IActionResult> Details(int id)
         {
-            WorkItem? workItem = await _context.WorkItems
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.Id == id);
+            ServiceResult<WorkItem> result =
+                await _workItemService.GetDetailsAsync(
+                    id,
+                    GetCurrentUserId());
 
-            if (workItem == null)
+            if (!result.IsSuccess)
             {
-                return NotFound();
+                return HandleWorkItemFailure(result);
             }
 
-            int? currentUserId = GetCurrentUserId();
-
-            /*
-             * Kullanıcı giriş yaptıysa başka proje yöneticisine ait
-             * talebi görüntülemesine izin verilmez.
-             */
-            if (
-                currentUserId.HasValue &&
-                workItem.CreatedByUserId.HasValue &&
-                workItem.CreatedByUserId != currentUserId
-            )
-            {
-                return Forbid();
-            }
-
-            return View(workItem);
+            return View(result.Data);
         }
 
         // Talebi güncelleme sayfasını açar.
         [HttpGet]
         public async Task<IActionResult> Edit(int id)
         {
-            WorkItem? workItem = await _context.WorkItems
-                .FirstOrDefaultAsync(x => x.Id == id);
+            ServiceResult<WorkItem> result =
+                await _workItemService.GetForEditAsync(
+                    id,
+                    GetCurrentUserId());
 
-            if (workItem == null)
+            if (!result.IsSuccess)
             {
-                return NotFound();
+                return HandleWorkItemFailure(result);
             }
 
-            int? currentUserId = GetCurrentUserId();
-            if (
-                currentUserId.HasValue &&
-                workItem.CreatedByUserId.HasValue &&
-                workItem.CreatedByUserId != currentUserId
-            )
-            {
-                return Forbid();
-            }
-
-            if (workItem.WorkflowStatus != WorkflowStatus.Submitted)
-            {
-                TempData["ErrorMessage"] = "Sadece 'Gönderildi' durumundaki talepler güncellenebilir.";
-                return RedirectToAction(nameof(Index));
-            }
-
-            return View(workItem);
+            return View(result.Data);
         }
 
         // Güncellenen talebi kaydeder.
@@ -207,40 +142,26 @@ namespace FlowDesk.Controllers
                 return BadRequest();
             }
 
-            WorkItem? dbWorkItem = await _context.WorkItems
-                .FirstOrDefaultAsync(x => x.Id == id);
+            ServiceResult<WorkItem> accessResult =
+                await _workItemService.GetForEditAsync(
+                    id,
+                    GetCurrentUserId());
 
-            if (dbWorkItem == null)
+            if (!accessResult.IsSuccess)
             {
-                return NotFound();
+                return HandleWorkItemFailure(accessResult);
             }
 
-            int? currentUserId = GetCurrentUserId();
-            if (
-                currentUserId.HasValue &&
-                dbWorkItem.CreatedByUserId.HasValue &&
-                dbWorkItem.CreatedByUserId != currentUserId
-            )
-            {
-                return Forbid();
-            }
+            ServiceResult<string> validationResult =
+                await _workItemService.ValidateUpdateAsync(
+                    id,
+                    workItem.RequestNumber);
 
-            if (dbWorkItem.WorkflowStatus != WorkflowStatus.Submitted)
-            {
-                TempData["ErrorMessage"] = "Sadece 'Gönderildi' durumundaki talepler güncellenebilir.";
-                return RedirectToAction(nameof(Index));
-            }
-
-            string normalizedRequestNumber = workItem.RequestNumber.Trim();
-            bool requestNumberExists = await _context.WorkItems.AnyAsync(
-                x => x.RequestNumber == normalizedRequestNumber && x.Id != id
-            );
-
-            if (requestNumberExists)
+            if (!validationResult.IsSuccess)
             {
                 ModelState.AddModelError(
                     nameof(workItem.RequestNumber),
-                    "Bu talep numarası daha önce kullanılmış."
+                    validationResult.ErrorMessage!
                 );
             }
 
@@ -251,16 +172,21 @@ namespace FlowDesk.Controllers
                 return View(workItem);
             }
 
-            dbWorkItem.RequestNumber = normalizedRequestNumber;
-            dbWorkItem.RequestDescription = workItem.RequestDescription.Trim();
-            dbWorkItem.Department = workItem.Department.Trim();
-            dbWorkItem.Priority = workItem.Priority;
-            dbWorkItem.UpdatedAt = DateTime.UtcNow;
+            ServiceResult updateResult =
+                await _workItemService.UpdateAsync(
+                    id,
+                    workItem,
+                    validationResult.Data!,
+                    GetCurrentUserId());
 
-            _context.Update(dbWorkItem);
-            await _context.SaveChangesAsync();
+            if (!updateResult.IsSuccess)
+            {
+                return HandleWorkItemFailure(updateResult);
+            }
 
-            TempData["SuccessMessage"] = "Talep başarıyla güncellendi.";
+            TempData["SuccessMessage"] =
+                "Talep başarıyla güncellendi.";
+
             return RedirectToAction(nameof(Index));
         }
 
@@ -268,32 +194,17 @@ namespace FlowDesk.Controllers
         [HttpGet]
         public async Task<IActionResult> Delete(int id)
         {
-            WorkItem? workItem = await _context.WorkItems
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.Id == id);
+            ServiceResult<WorkItem> result =
+                await _workItemService.GetForDeleteAsync(
+                    id,
+                    GetCurrentUserId());
 
-            if (workItem == null)
+            if (!result.IsSuccess)
             {
-                return NotFound();
+                return HandleWorkItemFailure(result);
             }
 
-            int? currentUserId = GetCurrentUserId();
-            if (
-                currentUserId.HasValue &&
-                workItem.CreatedByUserId.HasValue &&
-                workItem.CreatedByUserId != currentUserId
-            )
-            {
-                return Forbid();
-            }
-
-            if (workItem.WorkflowStatus != WorkflowStatus.Submitted)
-            {
-                TempData["ErrorMessage"] = "Sadece 'Gönderildi' durumundaki talepler silinebilir.";
-                return RedirectToAction(nameof(Index));
-            }
-
-            return View(workItem);
+            return View(result.Data);
         }
 
         // Talebi sistemden siler.
@@ -301,34 +212,36 @@ namespace FlowDesk.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            WorkItem? workItem = await _context.WorkItems
-                .FirstOrDefaultAsync(x => x.Id == id);
+            ServiceResult result =
+                await _workItemService.DeleteAsync(
+                    id,
+                    GetCurrentUserId());
 
-            if (workItem == null)
+            if (!result.IsSuccess)
+            {
+                return HandleWorkItemFailure(result);
+            }
+
+            TempData["SuccessMessage"] =
+                "Talep başarıyla silindi.";
+
+            return RedirectToAction(nameof(Index));
+        }
+
+        private IActionResult HandleWorkItemFailure(
+            ServiceResult result)
+        {
+            if (result.IsNotFound)
             {
                 return NotFound();
             }
 
-            int? currentUserId = GetCurrentUserId();
-            if (
-                currentUserId.HasValue &&
-                workItem.CreatedByUserId.HasValue &&
-                workItem.CreatedByUserId != currentUserId
-            )
+            if (result.IsForbidden)
             {
                 return Forbid();
             }
 
-            if (workItem.WorkflowStatus != WorkflowStatus.Submitted)
-            {
-                TempData["ErrorMessage"] = "Sadece 'Gönderildi' durumundaki talepler silinebilir.";
-                return RedirectToAction(nameof(Index));
-            }
-
-            _context.WorkItems.Remove(workItem);
-            await _context.SaveChangesAsync();
-
-            TempData["SuccessMessage"] = "Talep başarıyla silindi.";
+            TempData["ErrorMessage"] = result.ErrorMessage;
             return RedirectToAction(nameof(Index));
         }
 

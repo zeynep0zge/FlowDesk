@@ -1,9 +1,20 @@
-﻿using FlowDesk.Models;
+using FlowDesk.Models;
 
 namespace FlowDesk.Repositories.Interfaces
 {
     public interface IWorkItemRepository
     {
+        Task<List<WorkItem>>
+            GetProjectManagerRequestsAsync(int? currentUserId);
+
+        Task<bool> RequestNumberExistsAsync(
+            string requestNumber,
+            int? excludedWorkItemId = null);
+
+        void Add(WorkItem workItem);
+
+        void Remove(WorkItem workItem);
+
         Task<List<WorkItem>> GetAnalystInboxAsync();
 
         Task<List<WorkItem>> GetReturnedRequestsAsync();
