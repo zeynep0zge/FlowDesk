@@ -48,6 +48,9 @@ builder.Services.AddScoped<IEmailService, BrevoEmailService>();
 builder.Services.AddScoped<
     IAccountRegistrationService,
     AccountRegistrationService>();
+builder.Services.AddScoped<
+    IAccountEmailVerificationService,
+    AccountEmailVerificationService>();
 builder.Services.ConfigureApplicationCookie(options =>
 {
     options.LoginPath = "/Account/Login";
