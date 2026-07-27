@@ -24,14 +24,11 @@ namespace FlowDesk.Controllers
         private readonly IEmailService _emailService;
         private readonly IAccountRegistrationService
             _accountRegistrationService;
+        private readonly IAccountEmailVerificationService
+            _accountEmailVerificationService;
 
         private readonly IPasswordHasher<PasswordResetRequest>
             _passwordResetHasher;
-
-        private readonly IPasswordHasher<EmailVerificationRequest>
-            _emailVerificationHasher;
-
-        private readonly ILogger<AccountController> _logger;
 
 
         public AccountController(
@@ -40,18 +37,18 @@ namespace FlowDesk.Controllers
         AppDbContext dbContext,
         IEmailService emailService,
         IPasswordHasher<PasswordResetRequest> passwordResetHasher,
-        IPasswordHasher<EmailVerificationRequest> emailVerificationHasher,
         IAccountRegistrationService accountRegistrationService,
-        ILogger<AccountController> logger)
+        IAccountEmailVerificationService
+            accountEmailVerificationService)
         {
             _signInManager = signInManager;
             _userManager = userManager;
             _dbContext = dbContext;
             _emailService = emailService;
             _passwordResetHasher = passwordResetHasher;
-            _emailVerificationHasher = emailVerificationHasher;
             _accountRegistrationService = accountRegistrationService;
-            _logger = logger;
+            _accountEmailVerificationService =
+                accountEmailVerificationService;
         }
         [AllowAnonymous]
         [HttpGet]
@@ -439,103 +436,21 @@ namespace FlowDesk.Controllers
                 return View(model);
             }
 
-            var user = await _userManager.FindByEmailAsync(model.Email);
+            ServiceResult<EmailVerificationResult> result =
+                await _accountEmailVerificationService.VerifyAsync(model);
 
-            if (user == null || user.EmailConfirmed)
+            if (!result.IsSuccess)
             {
-                ModelState.AddModelError(
-                    string.Empty,
-                    "Kod geçersiz veya süresi dolmuş.");
-
-                return View(model);
-            }
-
-            var verificationRequest =
-                await _dbContext.EmailVerificationRequests
-                    .Where(x =>
-                        x.UserId == user.Id &&
-                        !x.IsInvalidated &&
-                        x.VerifiedAtUtc == null)
-                    .OrderByDescending(x => x.CreatedAtUtc)
-                    .FirstOrDefaultAsync();
-
-            if (verificationRequest == null)
-            {
-                ModelState.AddModelError(
-                    string.Empty,
-                    "Kod geçersiz veya süresi dolmuş.");
-
-                return View(model);
-            }
-
-            if (verificationRequest.ExpiresAtUtc <= DateTime.UtcNow)
-            {
-                verificationRequest.IsInvalidated = true;
-                await _dbContext.SaveChangesAsync();
-
-                ModelState.AddModelError(
-                    string.Empty,
-                    "Doğrulama kodunun süresi dolmuş. Yeni kod isteyin.");
-
-                return View(model);
-            }
-
-            if (verificationRequest.FailedAttemptCount >= 5)
-            {
-                verificationRequest.IsInvalidated = true;
-                await _dbContext.SaveChangesAsync();
-
-                ModelState.AddModelError(
-                    string.Empty,
-                    "Çok fazla yanlış deneme yapıldı. Yeni kod isteyin.");
-
-                return View(model);
-            }
-
-            var verificationResult =
-                _emailVerificationHasher.VerifyHashedPassword(
-                    verificationRequest,
-                    verificationRequest.CodeHash,
-                    model.Code);
-
-            if (verificationResult == PasswordVerificationResult.Failed)
-            {
-                verificationRequest.FailedAttemptCount++;
-
-                if (verificationRequest.FailedAttemptCount >= 5)
+                foreach (EmailVerificationError error
+                         in result.Data?.Errors ?? [])
                 {
-                    verificationRequest.IsInvalidated = true;
-                }
-
-                await _dbContext.SaveChangesAsync();
-
-                ModelState.AddModelError(
-                    string.Empty,
-                    "Doğrulama kodu hatalı.");
-
-                return View(model);
-            }
-
-            verificationRequest.VerifiedAtUtc = DateTime.UtcNow;
-            verificationRequest.IsInvalidated = true;
-            user.EmailConfirmed = true;
-
-            var updateResult = await _userManager.UpdateAsync(user);
-
-            if (!updateResult.Succeeded)
-            {
-                foreach (var error in updateResult.Errors)
-                {
-                    ModelState.AddModelError(string.Empty, error.Description);
+                    ModelState.AddModelError(error.Key, error.Message);
                 }
 
                 return View(model);
             }
 
-            await _dbContext.SaveChangesAsync();
-
-            TempData["Success"] =
-                "E-posta adresiniz doğrulandı. Hesabınız yönetici onayına gönderildi.";
+            TempData["Success"] = result.SuccessMessage;
 
             return RedirectToAction(nameof(PendingApproval));
         }
@@ -546,43 +461,14 @@ namespace FlowDesk.Controllers
         public async Task<IActionResult> ResendEmailVerificationCode(
             string email)
         {
-            const string genericMessage =
-                "Hesabınız doğrulama için uygunsa yeni kod gönderildi. Lütfen e-posta kutunuzu kontrol edin.";
+            ServiceResult<EmailVerificationResendResult> result =
+                await _accountEmailVerificationService.ResendAsync(email);
 
-            string normalizedEmail = email?.Trim() ?? string.Empty;
-
-            if (!string.IsNullOrWhiteSpace(normalizedEmail))
-            {
-                var user =
-                    await _userManager.FindByEmailAsync(normalizedEmail);
-
-                if (user != null &&
-                    !user.EmailConfirmed &&
-                    !string.IsNullOrWhiteSpace(user.Email))
-                {
-                    var latestRequest =
-                        await _dbContext.EmailVerificationRequests
-                            .Where(x => x.UserId == user.Id)
-                            .OrderByDescending(x => x.CreatedAtUtc)
-                            .FirstOrDefaultAsync();
-
-                    bool canResend =
-                        latestRequest == null ||
-                        latestRequest.CreatedAtUtc <=
-                            DateTime.UtcNow.AddSeconds(-60);
-
-                    if (canResend)
-                    {
-                        await CreateAndSendEmailVerificationCodeAsync(user);
-                    }
-                }
-            }
-
-            TempData["Info"] = genericMessage;
+            TempData["Info"] = result.SuccessMessage;
 
             return RedirectToAction(
                 nameof(VerifyEmailCode),
-                new { email = normalizedEmail });
+                new { email = result.Data!.Email });
         }
 
         [AllowAnonymous]
@@ -784,88 +670,6 @@ namespace FlowDesk.Controllers
                     department,
                     department))
                 .ToList();
-        }
-
-        private async Task<bool> CreateAndSendEmailVerificationCodeAsync(
-            ApplicationUser user)
-        {
-            var previousRequests =
-                await _dbContext.EmailVerificationRequests
-                    .Where(x =>
-                        x.UserId == user.Id &&
-                        !x.IsInvalidated &&
-                        x.VerifiedAtUtc == null)
-                    .ToListAsync();
-
-            foreach (var previousRequest in previousRequests)
-            {
-                previousRequest.IsInvalidated = true;
-            }
-
-            string code = RandomNumberGenerator
-                .GetInt32(0, 1000000)
-                .ToString("D6");
-
-            var verificationRequest = new EmailVerificationRequest
-            {
-                UserId = user.Id,
-                CreatedAtUtc = DateTime.UtcNow,
-                ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10)
-            };
-
-            verificationRequest.CodeHash =
-                _emailVerificationHasher.HashPassword(
-                    verificationRequest,
-                    code);
-
-            _dbContext.EmailVerificationRequests.Add(
-                verificationRequest);
-
-            await _dbContext.SaveChangesAsync();
-
-            try
-            {
-                await _emailService.SendAsync(
-                    user.Email!,
-                    "FlowDesk E-posta Doğrulama Kodu",
-                    $"""
-                    <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.6">
-                        <h2 style="color:#1e3a8a">FlowDesk</h2>
-                        <p>E-posta doğrulama kodunuz:</p>
-                        <div style="font-size:32px;font-weight:bold;letter-spacing:8px;margin:24px 0;color:#1e3a8a">
-                            {code}
-                        </div>
-                        <p>Bu kod 10 dakika geçerlidir.</p>
-                        <p>Bu işlemi siz başlatmadıysanız bu e-postayı dikkate almayın.</p>
-                    </div>
-                    """);
-
-                return true;
-            }
-            catch (Exception exception)
-            {
-                _logger.LogError(
-                    exception,
-                    "Kullanıcı {UserId} için doğrulama e-postası gönderilemedi.",
-                    user.Id);
-
-                try
-                {
-                    _dbContext.EmailVerificationRequests.Remove(
-                        verificationRequest);
-
-                    await _dbContext.SaveChangesAsync();
-                }
-                catch (Exception cleanupException)
-                {
-                    _logger.LogError(
-                        cleanupException,
-                        "Gönderilemeyen doğrulama kaydı temizlenemedi. UserId: {UserId}",
-                        user.Id);
-                }
-
-                return false;
-            }
         }
 
         private static string HashResetSessionToken(string token)
