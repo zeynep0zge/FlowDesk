@@ -51,6 +51,9 @@ builder.Services.AddScoped<
 builder.Services.AddScoped<
     IAccountEmailVerificationService,
     AccountEmailVerificationService>();
+builder.Services.AddScoped<
+    IAccountPasswordResetService,
+    AccountPasswordResetService>();
 builder.Services.ConfigureApplicationCookie(options =>
 {
     options.LoginPath = "/Account/Login";
