@@ -1,6 +1,5 @@
 ﻿using FlowDesk.Constants;
 using FlowDesk.Common;
-using FlowDesk.Data;
 using FlowDesk.Models;
 using FlowDesk.Services.Interfaces;
 using FlowDesk.Services.Models;
@@ -9,9 +8,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore;
-using System.Security.Cryptography;
-using System.Text;
 
 
 namespace FlowDesk.Controllers
@@ -20,35 +16,27 @@ namespace FlowDesk.Controllers
     {
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly UserManager<ApplicationUser> _userManager;
-        private readonly AppDbContext _dbContext;
-        private readonly IEmailService _emailService;
         private readonly IAccountRegistrationService
             _accountRegistrationService;
         private readonly IAccountEmailVerificationService
             _accountEmailVerificationService;
-
-        private readonly IPasswordHasher<PasswordResetRequest>
-            _passwordResetHasher;
+        private readonly IAccountPasswordResetService
+            _accountPasswordResetService;
 
 
         public AccountController(
         SignInManager<ApplicationUser> signInManager,
         UserManager<ApplicationUser> userManager,
-        AppDbContext dbContext,
-        IEmailService emailService,
-        IPasswordHasher<PasswordResetRequest> passwordResetHasher,
         IAccountRegistrationService accountRegistrationService,
-        IAccountEmailVerificationService
-            accountEmailVerificationService)
+        IAccountEmailVerificationService accountEmailVerificationService,
+        IAccountPasswordResetService accountPasswordResetService)
         {
             _signInManager = signInManager;
             _userManager = userManager;
-            _dbContext = dbContext;
-            _emailService = emailService;
-            _passwordResetHasher = passwordResetHasher;
             _accountRegistrationService = accountRegistrationService;
             _accountEmailVerificationService =
                 accountEmailVerificationService;
+            _accountPasswordResetService = accountPasswordResetService;
         }
         [AllowAnonymous]
         [HttpGet]
@@ -68,71 +56,15 @@ namespace FlowDesk.Controllers
                 return View(model);
             }
 
-            var user = await _userManager.FindByEmailAsync(model.Email);
+            ServiceResult<PasswordResetRequestResult> result =
+                await _accountPasswordResetService
+                    .RequestResetAsync(model);
 
-            // Hesabın sistemde olup olmadığını dışarıya açıklamıyoruz.
-            if (user != null && !string.IsNullOrWhiteSpace(user.Email))
-            {
-                var previousRequests =
-                    await _dbContext.PasswordResetRequests
-                        .Where(x =>
-                            x.UserId == user.Id &&
-                            !x.IsInvalidated &&
-                            x.CompletedAtUtc == null)
-                        .ToListAsync();
-
-                foreach (var previousRequest in previousRequests)
-                {
-                    previousRequest.IsInvalidated = true;
-                }
-
-                var code = RandomNumberGenerator
-                    .GetInt32(100000, 1000000)
-                    .ToString();
-
-                var resetRequest = new PasswordResetRequest
-                {
-                    UserId = user.Id,
-                    CreatedAtUtc = DateTime.UtcNow,
-                    ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10)
-                };
-
-                resetRequest.CodeHash =
-                    _passwordResetHasher.HashPassword(
-                        resetRequest,
-                        code);
-
-                _dbContext.PasswordResetRequests.Add(resetRequest);
-                await _dbContext.SaveChangesAsync();
-
-                await _emailService.SendAsync(
-                    user.Email,
-                    "FlowDesk Şifre Sıfırlama Kodu",
-                    $"""
-            <div style="font-family:Arial,sans-serif">
-                <h2>FlowDesk</h2>
-                <p>Şifre sıfırlama kodunuz:</p>
-
-                <div style="
-                    font-size:32px;
-                    font-weight:bold;
-                    letter-spacing:8px;
-                    margin:24px 0;">
-                    {code}
-                </div>
-
-                <p>Bu kod 10 dakika geçerlidir.</p>
-                <p>Bu işlemi siz başlatmadıysanız e-postayı dikkate almayın.</p>
-            </div>
-            """);
-            }
-
-            TempData["Info"] =
-                "Hesabınız bulunuyorsa doğrulama kodu e-posta adresinize gönderildi.";
+            TempData["Info"] = result.SuccessMessage;
 
             return RedirectToAction(
                 nameof(VerifyResetCode),
-                new { email = model.Email });
+                new { email = result.Data!.Email });
         }
 
         [AllowAnonymous]
@@ -156,96 +88,27 @@ namespace FlowDesk.Controllers
                 return View(model);
             }
 
-            var user = await _userManager.FindByEmailAsync(model.Email);
+            ServiceResult<PasswordResetCodeResult> result =
+                await _accountPasswordResetService
+                    .VerifyCodeAsync(model);
 
-            if (user == null)
+            if (!result.IsSuccess)
             {
-                ModelState.AddModelError(
-                    string.Empty,
-                    "Kod geçersiz veya süresi dolmuş.");
-
-                return View(model);
-            }
-
-            var resetRequest = await _dbContext.PasswordResetRequests
-                .Where(x =>
-                    x.UserId == user.Id &&
-                    !x.IsInvalidated &&
-                    x.CompletedAtUtc == null &&
-                    x.CodeVerifiedAtUtc == null)
-                .OrderByDescending(x => x.CreatedAtUtc)
-                .FirstOrDefaultAsync();
-
-            if (resetRequest == null ||
-                resetRequest.ExpiresAtUtc <= DateTime.UtcNow)
-            {
-                if (resetRequest != null)
+                foreach (PasswordResetError error
+                         in result.Data?.Errors ?? [])
                 {
-                    resetRequest.IsInvalidated = true;
-                    await _dbContext.SaveChangesAsync();
+                    ModelState.AddModelError(error.Key, error.Message);
                 }
 
-                ModelState.AddModelError(
-                    string.Empty,
-                    "Kod geçersiz veya süresi dolmuş.");
-
                 return View(model);
             }
-
-            if (resetRequest.FailedAttemptCount >= 5)
-            {
-                resetRequest.IsInvalidated = true;
-                await _dbContext.SaveChangesAsync();
-
-                ModelState.AddModelError(
-                    string.Empty,
-                    "Çok fazla yanlış deneme yapıldı. Yeni kod isteyin.");
-
-                return View(model);
-            }
-
-            var verificationResult =
-                _passwordResetHasher.VerifyHashedPassword(
-                    resetRequest,
-                    resetRequest.CodeHash,
-                    model.Code);
-
-            if (verificationResult == PasswordVerificationResult.Failed)
-            {
-                resetRequest.FailedAttemptCount++;
-
-                if (resetRequest.FailedAttemptCount >= 5)
-                {
-                    resetRequest.IsInvalidated = true;
-                }
-
-                await _dbContext.SaveChangesAsync();
-
-                ModelState.AddModelError(
-                    string.Empty,
-                    "Doğrulama kodu hatalı.");
-
-                return View(model);
-            }
-
-            var resetSessionToken =
-                Convert.ToHexString(
-                    RandomNumberGenerator.GetBytes(32));
-
-            resetRequest.CodeVerifiedAtUtc = DateTime.UtcNow;
-            resetRequest.ResetSessionHash =
-                HashResetSessionToken(resetSessionToken);
-            resetRequest.ResetSessionExpiresAtUtc =
-                DateTime.UtcNow.AddMinutes(10);
-
-            await _dbContext.SaveChangesAsync();
 
             return RedirectToAction(
                 nameof(ResetPassword),
                 new
                 {
-                    email = model.Email,
-                    token = resetSessionToken
+                    email = result.Data!.Email,
+                    token = result.Data.ResetSessionToken
                 });
         }
 
@@ -279,69 +142,22 @@ namespace FlowDesk.Controllers
                 return View(model);
             }
 
-            var user = await _userManager.FindByEmailAsync(model.Email);
+            ServiceResult<PasswordResetCompletionResult> result =
+                await _accountPasswordResetService
+                    .ResetPasswordAsync(model);
 
-            if (user == null)
+            if (!result.IsSuccess)
             {
-                ModelState.AddModelError(
-                    string.Empty,
-                    "Şifre sıfırlama isteği geçersiz.");
-
-                return View(model);
-            }
-
-            var sessionHash =
-                HashResetSessionToken(model.ResetSessionToken);
-
-            var resetRequest =
-                await _dbContext.PasswordResetRequests
-                    .Where(x =>
-                        x.UserId == user.Id &&
-                        x.ResetSessionHash == sessionHash &&
-                        x.CodeVerifiedAtUtc != null &&
-                        x.ResetSessionExpiresAtUtc > DateTime.UtcNow &&
-                        x.CompletedAtUtc == null &&
-                        !x.IsInvalidated)
-                    .OrderByDescending(x => x.CreatedAtUtc)
-                    .FirstOrDefaultAsync();
-
-            if (resetRequest == null)
-            {
-                ModelState.AddModelError(
-                    string.Empty,
-                    "Şifre sıfırlama bağlantısı geçersiz veya süresi dolmuş.");
-
-                return View(model);
-            }
-
-            var identityToken =
-                await _userManager.GeneratePasswordResetTokenAsync(user);
-
-            var result =
-                await _userManager.ResetPasswordAsync(
-                    user,
-                    identityToken,
-                    model.NewPassword);
-
-            if (!result.Succeeded)
-            {
-                foreach (var error in result.Errors)
+                foreach (PasswordResetError error
+                         in result.Data?.Errors ?? [])
                 {
-                    ModelState.AddModelError(
-                        string.Empty,
-                        error.Description);
+                    ModelState.AddModelError(error.Key, error.Message);
                 }
 
                 return View(model);
             }
 
-            resetRequest.CompletedAtUtc = DateTime.UtcNow;
-            resetRequest.IsInvalidated = true;
-
-            await _dbContext.SaveChangesAsync();
-
-            TempData["Success"] =
-                "Şifreniz başarıyla güncellendi. Yeni şifrenizle giriş yapabilirsiniz.";
+            TempData["Success"] = result.SuccessMessage;
 
             return RedirectToAction(nameof(Login));
         }
@@ -670,14 +486,6 @@ namespace FlowDesk.Controllers
                     department,
                     department))
                 .ToList();
-        }
-
-        private static string HashResetSessionToken(string token)
-        {
-            var bytes = Encoding.UTF8.GetBytes(token);
-            var hash = SHA256.HashData(bytes);
-
-            return Convert.ToHexString(hash);
         }
 
     }
