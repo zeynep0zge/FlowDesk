@@ -3,6 +3,7 @@ using FlowDesk.Common;
 using FlowDesk.Data;
 using FlowDesk.Models;
 using FlowDesk.Services.Interfaces;
+using FlowDesk.Services.Models;
 using FlowDesk.ViewModels.Account;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -21,6 +22,8 @@ namespace FlowDesk.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly AppDbContext _dbContext;
         private readonly IEmailService _emailService;
+        private readonly IAccountRegistrationService
+            _accountRegistrationService;
 
         private readonly IPasswordHasher<PasswordResetRequest>
             _passwordResetHasher;
@@ -38,6 +41,7 @@ namespace FlowDesk.Controllers
         IEmailService emailService,
         IPasswordHasher<PasswordResetRequest> passwordResetHasher,
         IPasswordHasher<EmailVerificationRequest> emailVerificationHasher,
+        IAccountRegistrationService accountRegistrationService,
         ILogger<AccountController> logger)
         {
             _signInManager = signInManager;
@@ -46,6 +50,7 @@ namespace FlowDesk.Controllers
             _emailService = emailService;
             _passwordResetHasher = passwordResetHasher;
             _emailVerificationHasher = emailVerificationHasher;
+            _accountRegistrationService = accountRegistrationService;
             _logger = logger;
         }
         [AllowAnonymous]
@@ -374,69 +379,30 @@ namespace FlowDesk.Controllers
             model.Department = model.Department?.Trim() ?? string.Empty;
             model.RequestedRole = model.RequestedRole?.Trim() ?? string.Empty;
 
-            if (!AppRoles.IsSelfRegistrable(model.RequestedRole))
-            {
-                ModelState.AddModelError(
-                    nameof(model.RequestedRole),
-                    "Geçerli bir rol seçiniz.");
-            }
-
-            if (!DepartmentOptions.Contains(model.Department))
-            {
-                ModelState.AddModelError(
-                    nameof(model.Department),
-                    "Geçerli bir departman seçiniz.");
-            }
-
             if (!ModelState.IsValid)
             {
                 PrepareRegisterOptions(model);
                 return View(model);
             }
 
-            var existingUser =
-                await _userManager.FindByEmailAsync(model.Email);
+            ServiceResult<AccountRegistrationResult> result =
+                await _accountRegistrationService.RegisterAsync(model);
 
-            if (existingUser != null)
+            if (!result.IsSuccess)
             {
-                ModelState.AddModelError(
-                    nameof(model.Email),
-                    "Bu e-posta adresiyle daha önce hesap oluşturulmuş.");
-
-                PrepareRegisterOptions(model);
-                return View(model);
-            }
-
-            var user = new ApplicationUser
-            {
-                UserName = model.Email,
-                Email = model.Email,
-                FullName = model.FullName,
-                Department = model.Department,
-                RequestedRole = model.RequestedRole,
-                EmailConfirmed = false,
-                IsApproved = false,
-                CreatedAtUtc = DateTime.UtcNow
-            };
-
-            var createResult =
-                await _userManager.CreateAsync(user, model.Password);
-
-            if (!createResult.Succeeded)
-            {
-                foreach (var error in createResult.Errors)
+                foreach (AccountRegistrationError error
+                         in result.Data?.Errors ?? [])
                 {
-                    ModelState.AddModelError(string.Empty, error.Description);
+                    ModelState.AddModelError(error.Key, error.Message);
                 }
 
                 PrepareRegisterOptions(model);
                 return View(model);
             }
 
-            bool emailSent =
-                await CreateAndSendEmailVerificationCodeAsync(user);
+            AccountRegistrationResult registration = result.Data!;
 
-            if (emailSent)
+            if (registration.EmailSent)
             {
                 TempData["Info"] =
                     "Doğrulama kodu e-posta adresinize gönderildi.";
@@ -449,7 +415,7 @@ namespace FlowDesk.Controllers
 
             return RedirectToAction(
                 nameof(VerifyEmailCode),
-                new { email = user.Email });
+                new { email = registration.Email });
         }
 
         [AllowAnonymous]
