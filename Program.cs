@@ -45,6 +45,9 @@ builder.Services.Configure<EmailSettings>(
     builder.Configuration.GetSection("EmailSettings"));
 
 builder.Services.AddScoped<IEmailService, BrevoEmailService>();
+builder.Services.AddScoped<
+    IAccountRegistrationService,
+    AccountRegistrationService>();
 builder.Services.ConfigureApplicationCookie(options =>
 {
     options.LoginPath = "/Account/Login";
