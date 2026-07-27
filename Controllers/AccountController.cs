@@ -14,7 +14,6 @@ namespace FlowDesk.Controllers
 {
     public class AccountController : Controller
     {
-        private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IAccountRegistrationService
             _accountRegistrationService;
@@ -22,21 +21,23 @@ namespace FlowDesk.Controllers
             _accountEmailVerificationService;
         private readonly IAccountPasswordResetService
             _accountPasswordResetService;
+        private readonly IAccountAuthenticationService
+            _accountAuthenticationService;
 
 
         public AccountController(
-        SignInManager<ApplicationUser> signInManager,
         UserManager<ApplicationUser> userManager,
         IAccountRegistrationService accountRegistrationService,
         IAccountEmailVerificationService accountEmailVerificationService,
-        IAccountPasswordResetService accountPasswordResetService)
+        IAccountPasswordResetService accountPasswordResetService,
+        IAccountAuthenticationService accountAuthenticationService)
         {
-            _signInManager = signInManager;
             _userManager = userManager;
             _accountRegistrationService = accountRegistrationService;
             _accountEmailVerificationService =
                 accountEmailVerificationService;
             _accountPasswordResetService = accountPasswordResetService;
+            _accountAuthenticationService = accountAuthenticationService;
         }
         [AllowAnonymous]
         [HttpGet]
@@ -326,83 +327,46 @@ namespace FlowDesk.Controllers
                 return View(model);
             }
 
-            var user = await _userManager.FindByEmailAsync(model.Email);
+            string? localReturnUrl =
+                !string.IsNullOrWhiteSpace(model.ReturnUrl) &&
+                Url.IsLocalUrl(model.ReturnUrl)
+                    ? model.ReturnUrl
+                    : null;
 
-            if (user == null)
+            ServiceResult<AccountAuthenticationResult> result =
+                await _accountAuthenticationService.LoginAsync(
+                    model,
+                    localReturnUrl);
+
+            if (!result.IsSuccess)
             {
-                ModelState.AddModelError(
-                    string.Empty,
-                    "E-posta veya şifre hatalı.");
-
-                return View(model);
-            }
-
-            if (!user.EmailConfirmed || !user.IsApproved)
-            {
-                bool passwordIsValid =
-                    await _userManager.CheckPasswordAsync(
-                        user,
-                        model.Password);
-
-                if (!passwordIsValid)
+                foreach (AccountAuthenticationError error
+                         in result.Data?.Errors ?? [])
                 {
-                    ModelState.AddModelError(
-                        string.Empty,
-                        "E-posta veya şifre hatalı.");
+                    ModelState.AddModelError(error.Key, error.Message);
                 }
-                else if (!user.EmailConfirmed)
+
+                if (result.Data?.UseFreshLoginModel == true)
                 {
-                    ModelState.AddModelError(
-                        string.Empty,
-                        "Giriş yapabilmek için e-posta adresinizi doğrulamalısınız.");
-                }
-                else
-                {
-                    ModelState.AddModelError(
-                        string.Empty,
-                        "Hesabınız yönetici onayı bekliyor.");
+                    return View("Login", new LoginViewModel
+                    {
+                        Email = result.Data.Email
+                    });
                 }
 
                 return View(model);
             }
 
-            var result = await _signInManager.PasswordSignInAsync(
-                user,
-                model.Password,
-                model.RememberMe,
-                lockoutOnFailure: true);
+            AccountAuthenticationResult authentication = result.Data!;
 
-            if (result.Succeeded)
+            if (!string.IsNullOrWhiteSpace(authentication.ReturnUrl))
             {
-                if (!string.IsNullOrWhiteSpace(model.ReturnUrl)
-                    && Url.IsLocalUrl(model.ReturnUrl))
-                {
-                    return LocalRedirect(model.ReturnUrl);
-                }
-
-                return await RedirectByRoleAsync(user);
+                return LocalRedirect(authentication.ReturnUrl);
             }
 
-            if (result.IsLockedOut)
-            {
-                ModelState.AddModelError(
-                    string.Empty,
-                    "Çok fazla başarısız giriş yapıldı. Lütfen daha sonra tekrar deneyin.");
-            }
-            else if (result.IsNotAllowed)
-            {
-                ModelState.AddModelError(
-                    string.Empty,
-                    "Giriş yapabilmek için e-posta adresinizi doğrulamalısınız.");
-            }
-            else
-            {
-                ModelState.AddModelError(
-                    string.Empty,
-                    "E-posta veya şifre hatalı.");
-            }
-
-            return View(model);
+            return RedirectToAction(
+                authentication.ActionName,
+                authentication.ControllerName);
         }
 
         [Authorize]
@@ -410,7 +374,7 @@ namespace FlowDesk.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Logout()
         {
-            await _signInManager.SignOutAsync();
+            await _accountAuthenticationService.LogoutAsync();
 
             return RedirectToAction(nameof(Login));
         }
@@ -424,51 +388,26 @@ namespace FlowDesk.Controllers
         private async Task<IActionResult> RedirectByRoleAsync(
             ApplicationUser user)
         {
-            if (await _userManager.IsInRoleAsync(
-                    user,
-                    AppRoles.ProjectManager))
+            ServiceResult<AccountAuthenticationResult> result =
+                await _accountAuthenticationService
+                    .ResolveRoleTargetAsync(user);
+
+            if (result.IsSuccess)
             {
                 return RedirectToAction(
-                    "Index",
-                    "ProjectManager");
+                    result.Data!.ActionName,
+                    result.Data.ControllerName);
             }
 
-            if (await _userManager.IsInRoleAsync(
-                    user,
-                    AppRoles.Analyst))
+            foreach (AccountAuthenticationError error
+                     in result.Data?.Errors ?? [])
             {
-                return RedirectToAction(
-                    "Index",
-                    "Analyst");
+                ModelState.AddModelError(error.Key, error.Message);
             }
-
-            if (await _userManager.IsInRoleAsync(
-                    user,
-                    AppRoles.DepartmentManager))
-            {
-                return RedirectToAction(
-                    "Index",
-                    "DepartmentManager");
-            }
-
-            if (await _userManager.IsInRoleAsync(
-                    user,
-                    AppRoles.Employee))
-            {
-                return RedirectToAction(
-                    "Index",
-                    "Employee");
-            }
-
-            await _signInManager.SignOutAsync();
-
-            ModelState.AddModelError(
-                string.Empty,
-                "Bu kullanıcıya sistem rolü atanmamış.");
 
             return View("Login", new LoginViewModel
             {
-                Email = user.Email ?? string.Empty
+                Email = result.Data?.Email ?? string.Empty
             });
         }
 
