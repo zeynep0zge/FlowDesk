@@ -38,6 +38,13 @@ namespace FlowDesk.Repositories.Interfaces
             int id,
             string department);
 
+        Task<List<WorkItem>>
+            GetEmployeeAssignedWorkItemsAsync(int employeeId);
+
+        Task<WorkItem?> GetEmployeeWorkItemByIdAsync(
+            int workItemId,
+            int employeeId);
+
         Task<WorkItem?> GetByIdAsync(int id);
 
         Task<WorkItem?>

@@ -70,6 +70,10 @@ builder.Services.AddScoped<
     ProjectManagerWorkItemService>();
 
 builder.Services.AddScoped<
+    IEmployeeWorkItemService,
+    EmployeeWorkItemService>();
+
+builder.Services.AddScoped<
     IAccountApprovalService,
     AccountApprovalService>();
 

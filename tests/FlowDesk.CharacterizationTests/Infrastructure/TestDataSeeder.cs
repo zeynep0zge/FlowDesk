@@ -76,7 +76,8 @@ public static class TestDataSeeder
         WorkflowStatus workflowStatus,
         int? createdByUserId = 101,
         string? department = null,
-        int? analystId = null)
+        int? analystId = null,
+        int? developerId = null)
     {
         AppDbContext context =
             services.GetRequiredService<AppDbContext>();
@@ -89,6 +90,7 @@ public static class TestDataSeeder
             Priority = RequestPriority.Normal,
             CreatedByUserId = createdByUserId,
             AnalystId = analystId,
+            DeveloperId = developerId,
             WorkflowStatus = workflowStatus,
             CurrentStatus = workflowStatus.ToString(),
             CreatedAt = DateTime.UtcNow

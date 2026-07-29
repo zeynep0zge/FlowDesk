@@ -130,6 +130,27 @@ namespace FlowDesk.Repositories
                          x.Department == department);
         }
 
+        public async Task<List<WorkItem>>
+            GetEmployeeAssignedWorkItemsAsync(int employeeId)
+        {
+            return await _context.WorkItems
+                .AsNoTracking()
+                .Where(x => x.DeveloperId == employeeId)
+                .OrderByDescending(x => x.UpdatedAt ?? x.CreatedAt)
+                .ToListAsync();
+        }
+
+        public async Task<WorkItem?> GetEmployeeWorkItemByIdAsync(
+            int workItemId,
+            int employeeId)
+        {
+            return await _context.WorkItems
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x =>
+                    x.Id == workItemId &&
+                    x.DeveloperId == employeeId);
+        }
+
         public async Task<WorkItem?> GetByIdAsync(int id)
         {
             return await _context.WorkItems
