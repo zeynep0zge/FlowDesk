@@ -16,7 +16,7 @@
 </head>
 <body>
     <main class="login-page">
-        <section class="login-card auth-card-wide">
+        <section class="login-card account-card auth-card-wide">
             <div class="login-brand">
                 <div class="brand-icon">F</div>
                 <div>
@@ -31,7 +31,7 @@
             </div>
 
             <form asp-controller="Account" asp-action="Register" method="post">
-                <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
 
                 <div class="row g-3">
                     <div class="col-12">

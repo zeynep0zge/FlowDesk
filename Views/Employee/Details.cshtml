@@ -1,117 +1,52 @@
 @model FlowDesk.Models.WorkItem
-@using FlowDesk.Models
 
 @{
-    ViewData["Title"] = "Is Detayi";
-
-    string PriorityText(RequestPriority priority) => priority switch
-    {
-        RequestPriority.Low => "Dusuk",
-        RequestPriority.Normal => "Normal",
-        RequestPriority.High => "Yuksek",
-        RequestPriority.Critical => "Kritik",
-        _ => priority.ToString()
-    };
-
-    string StatusText(WorkflowStatus status) => status switch
-    {
-        WorkflowStatus.Submitted => "Gonderildi",
-        WorkflowStatus.UnderAnalystReview => "Analist Incelemesinde",
-        WorkflowStatus.WaitingManagerApproval => "Yonetici Onayinda",
-        WorkflowStatus.ReturnedToAnalyst => "Analiste Iade Edildi",
-        WorkflowStatus.Approved => "Onaylandi",
-        WorkflowStatus.Assigned => "Atandi",
-        WorkflowStatus.InProgress => "Devam Ediyor",
-        WorkflowStatus.Completed => "Tamamlandi",
-        WorkflowStatus.Rejected => "Reddedildi",
-        _ => status.ToString()
-    };
+    ViewData["Title"] = "\u0130\u015f Detay\u0131";
 }
 
 <div class="container-fluid p-0">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <header class="page-header">
         <div>
-            <h2 class="fw-bold mb-1" style="color: var(--primary-navy);">
-                Is Detayi
-            </h2>
-            <p class="text-muted mb-0">Talep No: @Model.RequestNumber</p>
+            <h1>&#304;&#351; Detay&#305;</h1>
+            <p class="page-description">Talep No: <strong>@Model.RequestNumber</strong> &middot; Bu ekran salt okunurdur.</p>
         </div>
-        <a asp-controller="Employee"
-           asp-action="Index"
-           class="btn btn-outline-secondary">
-            Atanan Islere Don
-        </a>
-    </div>
+        <div class="page-actions">
+            <a asp-controller="Employee" asp-action="Index" class="btn btn-secondary">Atanan i&#351;lere d&#246;n</a>
+        </div>
+    </header>
 
-    <section class="modern-card p-4">
-        <div class="row g-4">
-            <div class="col-md-6">
-                <div class="small text-muted">Talep No</div>
-                <div class="fw-semibold">@Model.RequestNumber</div>
+    <section class="modern-card" aria-labelledby="work-summary-title">
+        <div class="modern-card-header">
+            <h2 id="work-summary-title" class="modern-card-title">Talep &#246;zeti</h2>
+            <partial name="_WorkflowStatusBadge" model="Model.WorkflowStatus" />
+        </div>
+        <div class="p-4">
+            <div class="detail-grid">
+                <div class="detail-item"><div class="detail-label">Talep No</div><div class="detail-value">@Model.RequestNumber</div></div>
+                <div class="detail-item"><div class="detail-label">Departman</div><div class="detail-value">@Model.Department</div></div>
+                <div class="detail-item"><div class="detail-label">&#214;ncelik</div><div class="detail-value"><partial name="_PriorityBadge" model="Model.Priority" /></div></div>
+                <div class="detail-item"><div class="detail-label">Mevcut Stat&#252;</div><div class="detail-value">@Model.CurrentStatus</div></div>
+                <div class="detail-item"><div class="detail-label">Beklenen Stat&#252;</div><div class="detail-value">@(Model.ExpectedStatus ?? "-")</div></div>
+                <div class="detail-item"><div class="detail-label">S&#252;r&#252;m Tarihi</div><div class="detail-value">@(Model.ReleaseDate?.ToString("dd.MM.yyyy") ?? "-")</div></div>
+                <div class="detail-item"><div class="detail-label">Teslim Tarihi</div><div class="detail-value">@(Model.BanksoftDeliveryDate?.ToString("dd.MM.yyyy") ?? "-")</div></div>
+                <div class="detail-item"><div class="detail-label">Son G&#252;ncelleme</div><div class="detail-value">@(Model.UpdatedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "-")</div></div>
             </div>
-            <div class="col-md-6">
-                <div class="small text-muted">Departman</div>
-                <div class="fw-semibold">@Model.Department</div>
+
+            <div class="mt-4">
+                <h3 class="h6 fw-bold">Talep A&#231;&#305;klamas&#305;</h3>
+                <div class="detail-note">@Model.RequestDescription</div>
             </div>
-            <div class="col-md-6">
-                <div class="small text-muted">Oncelik</div>
-                <div>@PriorityText(Model.Priority)</div>
-            </div>
-            <div class="col-md-6">
-                <div class="small text-muted">Workflow Durumu</div>
-                <div>
-                    <span class="badge bg-light text-dark border">
-                        @StatusText(Model.WorkflowStatus)
-                    </span>
-                </div>
-            </div>
-            <div class="col-12">
-                <div class="small text-muted">Talep Aciklamasi</div>
-                <div class="border rounded bg-light p-3">
-                    @Model.RequestDescription
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="small text-muted">Beklenen Durum</div>
-                <div>@(Model.ExpectedStatus ?? "-")</div>
-            </div>
-            <div class="col-md-6">
-                <div class="small text-muted">Mevcut Durum</div>
-                <div>@Model.CurrentStatus</div>
-            </div>
-            <div class="col-md-6">
-                <div class="small text-muted">Surum Tarihi</div>
-                <div>@(Model.ReleaseDate?.ToString("dd.MM.yyyy") ?? "-")</div>
-            </div>
-            <div class="col-md-6">
-                <div class="small text-muted">Teslim Tarihi</div>
-                <div>@(Model.BanksoftDeliveryDate?.ToString("dd.MM.yyyy") ?? "-")</div>
-            </div>
-            <div class="col-12">
-                <div class="small text-muted">Analist Notu</div>
-                <div class="border rounded bg-light p-3">
-                    @(Model.AnalystNote ?? "Not bulunmuyor.")
-                </div>
+            <div class="mt-4">
+                <h3 class="h6 fw-bold">Analist Notu</h3>
+                <div class="detail-note">@(Model.AnalystNote ?? "Not bulunmuyor.")</div>
             </div>
             @if (!string.IsNullOrWhiteSpace(Model.ManagerNote))
             {
-                <div class="col-12">
-                    <div class="small text-muted">Yonetici Notu</div>
-                    <div class="border rounded bg-light p-3">
-                        @Model.ManagerNote
-                    </div>
+                <div class="mt-4">
+                    <h3 class="h6 fw-bold">Y&#246;netici Notu</h3>
+                    <div class="detail-note">@Model.ManagerNote</div>
                 </div>
             }
-            <div class="col-md-6">
-                <div class="small text-muted">Olusturulma</div>
-                <div>@Model.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
-            </div>
-            <div class="col-md-6">
-                <div class="small text-muted">Son Guncelleme</div>
-                <div>
-                    @(Model.UpdatedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "-")
-                </div>
-            </div>
         </div>
     </section>
 </div>

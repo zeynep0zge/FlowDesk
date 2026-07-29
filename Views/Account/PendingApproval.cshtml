@@ -14,7 +14,7 @@
 </head>
 <body>
     <main class="login-page">
-        <section class="login-card text-center">
+        <section class="login-card account-card text-center">
             <div class="login-brand justify-content-center">
                 <div class="brand-icon">F</div>
                 <div class="text-start">
@@ -32,7 +32,7 @@
 
             @if (TempData["Success"] != null)
             {
-                <div class="alert alert-success">@TempData["Success"]</div>
+                <div class="alert alert-success" role="status">@TempData["Success"]</div>
             }
 
             <a asp-controller="Account" asp-action="Login" class="btn btn-primary login-button">

@@ -22,7 +22,7 @@
 </head>
 <body>
     <main class="login-page">
-        <section class="login-card">
+        <section class="login-card account-card">
 
             <div class="login-brand">
                 <div class="brand-icon">F</div>
@@ -43,7 +43,7 @@
 
             @if (TempData["Info"] != null)
             {
-                <div class="alert alert-info">
+                <div class="alert alert-info" role="status">
                     @TempData["Info"]
                 </div>
             }
@@ -55,7 +55,7 @@
                 <input asp-for="Email" type="hidden" />
 
                 <div asp-validation-summary="ModelOnly"
-                     class="alert alert-danger">
+                     class="alert alert-danger" role="alert">
                 </div>
 
                 <div class="mb-4">

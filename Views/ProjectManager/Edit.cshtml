@@ -1,110 +1,53 @@
-﻿@model FlowDesk.Models.WorkItem
+@model FlowDesk.Models.WorkItem
 
-@{
-    ViewData["Title"] = "Talebi Güncelle";
-}
+@{ ViewData["Title"] = "Talebi G\u00fcncelle"; }
 
-<div class="container mt-4">
-    <div class="row justify-content-center">
-        <div class="col-lg-8">
-            <div class="card shadow-sm">
-                <div class="card-header">
-                    <h3 class="mb-0">Talebi Güncelle</h3>
+<div class="container-fluid p-0">
+    <header class="page-header">
+        <div>
+            <h1>Talebi G&#252;ncelle</h1>
+            <p class="page-description">Analist incelemesi ba&#351;lamadan &#246;nce talep bilgilerini d&#252;zenleyin.</p>
+        </div>
+        <div class="page-actions"><a asp-action="Index" class="btn btn-secondary">Taleplerime d&#246;n</a></div>
+    </header>
+    <section class="form-card" aria-labelledby="edit-form-title">
+        <h2 id="edit-form-title" class="form-title">Talep bilgileri</h2>
+        <form asp-controller="ProjectManager" asp-action="Edit" asp-route-id="@Model.Id" method="post">
+            @Html.AntiForgeryToken()
+            <input asp-for="Id" type="hidden" />
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+            <div class="mb-3">
+                <label asp-for="RequestNumber" class="form-label"></label>
+                <input asp-for="RequestNumber" class="form-control" maxlength="50" aria-required="true" />
+                <span asp-validation-for="RequestNumber" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="RequestDescription" class="form-label"></label>
+                <textarea asp-for="RequestDescription" class="form-control" rows="6" maxlength="2000" aria-required="true"></textarea>
+                <span asp-validation-for="RequestDescription" class="text-danger"></span>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-7">
+                    <label asp-for="Department" class="form-label"></label>
+                    <select asp-for="Department" asp-items="@(new Microsoft.AspNetCore.Mvc.Rendering.SelectList(FlowDesk.Common.DepartmentOptions.All))" class="form-select" aria-required="true">
+                        <option value="">Departman se&#231;iniz</option>
+                    </select>
+                    <span asp-validation-for="Department" class="text-danger"></span>
                 </div>
-
-                <div class="card-body">
-                    <form asp-controller="ProjectManager"
-                          asp-action="Edit"
-                          asp-route-id="@Model.Id"
-                          method="post">
-
-                        @Html.AntiForgeryToken()
-
-                        <input asp-for="Id" type="hidden" />
-
-                        <div asp-validation-summary="ModelOnly"
-                             class="text-danger mb-3">
-                        </div>
-
-                        <div class="mb-3">
-                            <label asp-for="RequestNumber"
-                                   class="form-label">
-                            </label>
-
-                            <input asp-for="RequestNumber"
-                                   class="form-control" />
-
-                            <span asp-validation-for="RequestNumber"
-                                  class="text-danger">
-                            </span>
-                        </div>
-
-                        <div class="mb-3">
-                            <label asp-for="RequestDescription"
-                                   class="form-label">
-                            </label>
-
-                            <textarea asp-for="RequestDescription"
-                                      class="form-control"
-                                      rows="6">
-                            </textarea>
-
-                            <span asp-validation-for="RequestDescription"
-                                  class="text-danger">
-                            </span>
-                        </div>
-
-                        <div class="mb-3">
-                            <label asp-for="Department"
-                                   class="form-label">
-                            </label>
-
-                            <select asp-for="Department"
-                                    asp-items="@(new Microsoft.AspNetCore.Mvc.Rendering.SelectList(FlowDesk.Common.DepartmentOptions.All))"
-                                    class="form-select">
-                                <option value="">Departman seçiniz</option>
-                            </select>
-
-                            <span asp-validation-for="Department"
-                                  class="text-danger">
-                            </span>
-                        </div>
-
-                        <div class="mb-3">
-                            <label asp-for="Priority"
-                                   class="form-label">
-                            </label>
-
-                            <select asp-for="Priority"
-                                    asp-items="Html.GetEnumSelectList<FlowDesk.Models.RequestPriority>()"
-                                    class="form-select">
-                            </select>
-
-                            <span asp-validation-for="Priority"
-                                  class="text-danger">
-                            </span>
-                        </div>
-
-                        <div class="d-flex justify-content-between">
-                            <a asp-action="Index"
-                               class="btn btn-outline-secondary">
-                                Geri Dön
-                            </a>
-
-                            <button type="submit"
-                                    class="btn btn-primary">
-                                Değişiklikleri Kaydet
-                            </button>
-                        </div>
-                    </form>
+                <div class="col-md-5">
+                    <label asp-for="Priority" class="form-label"></label>
+                    <select asp-for="Priority" asp-items="Html.GetEnumSelectList<FlowDesk.Models.RequestPriority>()" class="form-select"></select>
+                    <span asp-validation-for="Priority" class="text-danger"></span>
                 </div>
             </div>
-        </div>
-    </div>
+            <div class="form-actions mt-4 pt-3 border-top">
+                <a asp-action="Index" class="btn btn-secondary">Vazge&#231;</a>
+                <button type="submit" class="btn btn-primary">De&#287;i&#351;iklikleri Kaydet</button>
+            </div>
+        </form>
+    </section>
 </div>
 
 @section Scripts {
-    @{
-        await Html.RenderPartialAsync("_ValidationScriptsPartial");
-    }
+    @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
 }

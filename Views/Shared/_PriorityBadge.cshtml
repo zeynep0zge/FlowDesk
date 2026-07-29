@@ -1,0 +1,13 @@
+@model FlowDesk.Models.RequestPriority
+@using FlowDesk.Models
+@{
+    var badge = Model switch
+    {
+        RequestPriority.Low => ("D\u00fc\u015f\u00fck", "badge-priority-low"),
+        RequestPriority.Normal => ("Normal", "badge-priority-normal"),
+        RequestPriority.High => ("Y\u00fcksek", "badge-priority-high"),
+        RequestPriority.Critical => ("Kritik", "badge-priority-critical"),
+        _ => (Model.ToString(), "badge-status-neutral")
+    };
+}
+<span class="badge-pill-custom @badge.Item2">@badge.Item1</span>
