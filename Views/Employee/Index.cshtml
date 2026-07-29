@@ -2,59 +2,36 @@
 @using FlowDesk.Models
 
 @{
-    ViewData["Title"] = "Atanan Isler";
-    List<WorkItem> workItems = Model?.ToList() ?? [];
-
-    string PriorityText(RequestPriority priority) => priority switch
-    {
-        RequestPriority.Low => "Dusuk",
-        RequestPriority.Normal => "Normal",
-        RequestPriority.High => "Yuksek",
-        RequestPriority.Critical => "Kritik",
-        _ => priority.ToString()
-    };
-
-    string StatusText(WorkflowStatus status) => status switch
-    {
-        WorkflowStatus.Submitted => "Gonderildi",
-        WorkflowStatus.UnderAnalystReview => "Analist Incelemesinde",
-        WorkflowStatus.WaitingManagerApproval => "Yonetici Onayinda",
-        WorkflowStatus.ReturnedToAnalyst => "Analiste Iade Edildi",
-        WorkflowStatus.Approved => "Onaylandi",
-        WorkflowStatus.Assigned => "Atandi",
-        WorkflowStatus.InProgress => "Devam Ediyor",
-        WorkflowStatus.Completed => "Tamamlandi",
-        WorkflowStatus.Rejected => "Reddedildi",
-        _ => status.ToString()
-    };
+    ViewData["Title"] = "Atanan \u0130\u015fler";
+    var workItems = Model?.ToList() ?? new List<WorkItem>();
 }
 
 <div class="container-fluid p-0">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <header class="page-header">
         <div>
-            <h2 class="fw-bold mb-1" style="color: var(--primary-navy);">
-                Bana Atanan Isler
-            </h2>
-            <p class="text-muted mb-0">
-                Yalnizca size atanan talepler burada goruntulenir.
-            </p>
+            <h1>Atanan &#304;&#351;ler</h1>
+            <p class="page-description">Size atanan i&#351;leri ve g&#252;ncel durumlar&#305;n&#305; salt okunur olarak takip edin.</p>
         </div>
-        <span class="badge bg-primary fs-6">@workItems.Count kayit</span>
-    </div>
+        <span class="badge-pill-custom badge-status-neutral">@workItems.Count kay&#305;t</span>
+    </header>
 
     @if (TempData["ErrorMessage"] != null)
     {
-        <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+        <div class="alert alert-danger" role="alert">@TempData["ErrorMessage"]</div>
     }
 
-    <section class="modern-card">
-        @if (workItems.Count == 0)
+    <section class="modern-card" aria-labelledby="assigned-work-title">
+        <div class="modern-card-header">
+            <h2 id="assigned-work-title" class="modern-card-title">&#304;&#351; listesi</h2>
+        </div>
+        @if (!workItems.Any())
         {
-            <div class="empty-state p-5 text-center">
-                <h3 class="empty-state-title">Atanmis is bulunmuyor</h3>
-                <p class="empty-state-description mb-0">
-                    Size bir talep atandiginda bu ekranda gorunecektir.
-                </p>
+            <div class="empty-state">
+                <div class="empty-state-icon" aria-hidden="true">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                </div>
+                <h3 class="empty-state-title">Atanm&#305;&#351; i&#351; bulunmuyor</h3>
+                <p class="empty-state-description mb-0">Bir talep size atand&#305;&#287;&#305;nda burada g&#246;r&#252;nt&#252;lenecek.</p>
             </div>
         }
         else
@@ -65,10 +42,10 @@
                         <tr>
                             <th>Talep No</th>
                             <th>Departman</th>
-                            <th>Oncelik</th>
+                            <th>&#214;ncelik</th>
                             <th>Durum</th>
-                            <th>Guncellenme</th>
-                            <th class="text-end">Detay</th>
+                            <th>G&#252;ncellenme</th>
+                            <th class="text-end">&#304;&#351;lem</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -77,24 +54,11 @@
                             <tr>
                                 <td class="fw-semibold">@item.RequestNumber</td>
                                 <td>@item.Department</td>
-                                <td>@PriorityText(item.Priority)</td>
-                                <td>
-                                    <span class="badge bg-light text-dark border">
-                                        @StatusText(item.WorkflowStatus)
-                                    </span>
-                                </td>
-                                <td class="text-nowrap">
-                                    @((item.UpdatedAt ?? item.CreatedAt)
-                                        .ToLocalTime()
-                                        .ToString("dd.MM.yyyy HH:mm"))
-                                </td>
+                                <td><partial name="_PriorityBadge" model="item.Priority" /></td>
+                                <td><partial name="_WorkflowStatusBadge" model="item.WorkflowStatus" /></td>
+                                <td class="text-nowrap">@((item.UpdatedAt ?? item.CreatedAt).ToLocalTime().ToString("dd.MM.yyyy HH:mm"))</td>
                                 <td class="text-end">
-                                    <a asp-controller="Employee"
-                                       asp-action="Details"
-                                       asp-route-id="@item.Id"
-                                       class="btn btn-outline-primary btn-sm">
-                                        Goruntule
-                                    </a>
+                                    <a asp-controller="Employee" asp-action="Details" asp-route-id="@item.Id" class="btn btn-outline-primary btn-sm">G&#246;r&#252;nt&#252;le</a>
                                 </td>
                             </tr>
                         }

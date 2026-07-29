@@ -64,7 +64,7 @@
                         <path d="M2 17L12 22L22 17" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                         <path d="M2 12L12 17L22 12" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
-                    <span class="fw-bold text-white" style="font-size: 1rem; letter-spacing: 0.05em;">FlowDesk</span>
+                    <span class="mobile-brand-text">FlowDesk</span>
                 </a>
                 @if (hasSidebar)
                 {
@@ -72,7 +72,23 @@
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
                     </button>
                 }
+                else if (isAuthenticated)
+                {
+                    <div class="mobile-role-nav">
+                        <a asp-controller="@dashboardController" asp-action="@dashboardAction">Ana sayfa</a>
+                        @if (User.IsInRole(AppRoles.ProjectManager))
+                        {
+                            <a asp-controller="ProjectManager" asp-action="Create">Yeni talep</a>
+                        }
+                        @if (User.IsInRole(AppRoles.Analyst))
+                        {
+                            <a asp-controller="Analyst" asp-action="ReturnedRequests">&#304;adeler</a>
+                        }
+                    </div>
+                }
             </nav>
+
+            <div class="sidebar-backdrop" id="sidebarBackdrop" hidden></div>
 
             <!-- Main Header -->
             <header class="app-header">
@@ -91,9 +107,18 @@
 
                     <a asp-controller="@dashboardController"
                        asp-action="@dashboardAction"
-                       class="header-home-link">
+                       class="header-home-link header-nav-link">
                         Ana sayfa
                     </a>
+
+                    @if (User.IsInRole(AppRoles.ProjectManager))
+                    {
+                        <a asp-controller="ProjectManager" asp-action="Create" class="header-home-link header-nav-link">Yeni talep</a>
+                    }
+                    @if (User.IsInRole(AppRoles.Analyst))
+                    {
+                        <a asp-controller="Analyst" asp-action="ReturnedRequests" class="header-home-link header-nav-link">&#304;ade edilenler</a>
+                    }
 
                     <h5 class="header-page-title mb-0 text-dark fw-bold">
                         @ViewData["Title"]
@@ -117,6 +142,7 @@
                               asp-action="Logout"
                               method="post"
                               class="m-0">
+                            @Html.AntiForgeryToken()
                             <button type="submit" class="btn btn-outline-primary btn-sm">
                                 Çıkış yap
                             </button>
@@ -124,6 +150,7 @@
                     }
                     else
                     {
+                        <a asp-controller="Account" asp-action="Register" class="btn btn-link btn-sm">Hesap olu&#351;tur</a>
                         <a asp-controller="Account"
                            asp-action="Login"
                            class="btn btn-primary btn-sm">
@@ -153,7 +180,7 @@
     <script src="~/js/site.js" asp-append-version="true"></script>
     
     <script>
-        document.addEventListener("DOMContentLoaded", function () {
+        document.addEventListener("flowdesk:legacy-navigation-disabled", function () {
             // Toggling sidebar on mobile
             var toggleBtn = document.getElementById("sidebarToggle");
             var sidebar = document.getElementById("sidebarMenu");

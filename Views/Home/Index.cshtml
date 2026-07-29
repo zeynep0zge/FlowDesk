@@ -1,8 +1,23 @@
-﻿@{
-    ViewData["Title"] = "Home Page";
+@using FlowDesk.Constants
+@{
+    ViewData["Title"] = "FlowDesk";
+    string dashboardController =
+        User.IsInRole(AppRoles.ProjectManager) ? "ProjectManager" :
+        User.IsInRole(AppRoles.Analyst) ? "Analyst" :
+        User.IsInRole(AppRoles.DepartmentManager) ? "DepartmentManager" :
+        User.IsInRole(AppRoles.Employee) ? "Employee" : "Account";
+    string dashboardAction = User.Identity?.IsAuthenticated == true ? "Index" : "Login";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="container-fluid p-0">
+    <section class="modern-card mx-auto text-center" style="max-width: 760px;" aria-labelledby="welcome-title">
+        <div class="p-4 p-md-5">
+            <div class="brand-icon mx-auto mb-4" aria-hidden="true">F</div>
+            <h1 id="welcome-title" class="page-title">FlowDesk</h1>
+            <p class="page-description mx-auto mb-4">Talep, inceleme, onay ve atama s&#252;re&#231;lerini tek noktadan takip edin.</p>
+            <a asp-controller="@dashboardController" asp-action="@dashboardAction" class="btn btn-primary">
+                @(User.Identity?.IsAuthenticated == true ? "Ana sayfama git" : "Giri\u015f yap")
+            </a>
+        </div>
+    </section>
 </div>

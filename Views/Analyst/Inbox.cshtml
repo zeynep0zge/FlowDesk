@@ -15,7 +15,7 @@
 <div class="container-fluid p-0">
 
     <!-- Sayfa başlığı -->
-    <div class="d-flex flex-column flex-md-row
+    <div class="page-header d-flex flex-column flex-md-row
                 justify-content-between align-items-md-center
                 gap-3 mb-4">
 
@@ -282,17 +282,9 @@
                                         @item.Department
                                     </td>
 
-                                    <td>
-                                        <span class="badge rounded-pill @priorityClass">
-                                            @priorityText
-                                        </span>
-                                    </td>
+                                    <td><partial name="_PriorityBadge" model="item.Priority" /></td>
 
-                                    <td>
-                                        <span class="badge rounded-pill @workflowClass">
-                                            @workflowText
-                                        </span>
-                                    </td>
+                                    <td><partial name="_WorkflowStatusBadge" model="item.WorkflowStatus" /></td>
 
                                     <td>
                                         @if (string.IsNullOrWhiteSpace(item.CurrentStatus))

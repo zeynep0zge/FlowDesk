@@ -1,0 +1,21 @@
+@model FlowDesk.Models.WorkflowStatus
+@using FlowDesk.Models
+@{
+    var badge = Model switch
+    {
+        WorkflowStatus.Submitted => ("G\u00f6nderildi", "badge-status-submitted"),
+        WorkflowStatus.UnderAnalystReview => ("Analiz S\u00fcrecinde", "badge-status-review"),
+        WorkflowStatus.WaitingManagerApproval => ("Y\u00f6netici Onay\u0131nda", "badge-status-approval"),
+        WorkflowStatus.ReturnedToAnalyst => ("Analiste \u0130ade Edildi", "badge-status-returned"),
+        WorkflowStatus.Approved => ("Onayland\u0131", "badge-status-approved"),
+        WorkflowStatus.Assigned => ("Yaz\u0131l\u0131mc\u0131ya Atand\u0131", "badge-status-assigned"),
+        WorkflowStatus.InProgress => ("Geli\u015ftiriliyor", "badge-status-progress"),
+        WorkflowStatus.Completed => ("Tamamland\u0131", "badge-status-completed"),
+        WorkflowStatus.Rejected => ("Reddedildi", "badge-status-rejected"),
+        _ => (Model.ToString(), "badge-status-neutral")
+    };
+}
+<span class="badge-pill-custom @badge.Item2">
+    <span class="badge-dot" aria-hidden="true"></span>
+    @badge.Item1
+</span>

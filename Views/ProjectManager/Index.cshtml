@@ -74,7 +74,7 @@
 
 <div class="container-fluid p-0">
     <!-- Breadcrumbs / Top Actions bar -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <header class="page-header">
         <div>
             <h3 class="fw-bold mb-1" style="color: var(--primary-navy);">Taleplerim</h3>
             <p class="text-muted mb-0" style="font-size: 0.9rem;">
@@ -87,7 +87,7 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             Yeni Talep Oluştur
         </a>
-    </div>
+    </header>
 
     <!-- Alert Message -->
     @if (TempData["SuccessMessage"] != null)
@@ -213,18 +213,13 @@
                                     <span class="text-dark fw-medium">@item.Department</span>
                                 </td>
                                 <td>
-                                    <span class="badge-pill-custom @GetPriorityClass(item.Priority)">
-                                        @GetPriorityText(item.Priority)
-                                    </span>
+                                    <partial name="_PriorityBadge" model="item.Priority" />
                                 </td>
                                 <td>
                                     <span class="text-dark fw-medium" style="font-size: 0.85rem;">@item.CurrentStatus</span>
                                 </td>
                                 <td>
-                                    <span class="badge-pill-custom @GetWorkflowStatusClass(item.WorkflowStatus)">
-                                        <span class="d-inline-block rounded-circle me-1" style="width: 6px; height: 6px; background-color: currentColor;"></span>
-                                        @GetWorkflowStatusText(item.WorkflowStatus)
-                                    </span>
+                                    <partial name="_WorkflowStatusBadge" model="item.WorkflowStatus" />
                                 </td>
                                 <td class="text-muted" style="font-size: 0.8rem;">
                                     @item.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")

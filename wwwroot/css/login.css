@@ -4,8 +4,9 @@
 
 body {
     margin: 0;
-    font-family: Arial, Helvetica, sans-serif;
-    background: linear-gradient( 135deg, #eef2ff 0%, #f8fafc 50%, #e2e8f0 100% );
+    color: #0f172a;
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #f1f5f9;
 }
 
 .login-page {
@@ -22,8 +23,21 @@ body {
     padding: 40px;
     background-color: #ffffff;
     border: 1px solid #e2e8f0;
-    border-radius: 18px;
-    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.12);
+    border-radius: 16px;
+    box-shadow: 0 18px 45px rgba(15, 23, 42, 0.1);
+}
+
+.account-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.account-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 4px;
+    background: #1e3a8a;
 }
 
 .login-brand {
@@ -86,6 +100,36 @@ body {
     border-radius: 10px;
 }
 
+.form-control,
+.form-select,
+.btn {
+    font-size: .95rem;
+}
+
+.text-danger,
+.field-validation-error {
+    display: block;
+    margin-top: .3rem;
+    font-size: .825rem;
+}
+
+.alert {
+    border-radius: 10px;
+    font-size: .9rem;
+}
+
+a {
+    color: #1d4ed8;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, .28);
+    outline-offset: 2px;
+}
+
     .form-control:focus {
         border-color: #2563eb;
         box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
@@ -117,8 +161,21 @@ body {
 }
 
 @media (max-width: 576px) {
+    .login-page {
+        align-items: flex-start;
+        padding: 16px;
+    }
+
     .login-card {
         padding: 28px 22px;
+    }
+
+    .login-brand {
+        margin-bottom: 26px;
+    }
+
+    .login-header h2 {
+        font-size: 24px;
     }
 }
 
