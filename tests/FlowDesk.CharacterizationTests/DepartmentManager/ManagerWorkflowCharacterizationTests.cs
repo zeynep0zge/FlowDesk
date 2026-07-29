@@ -25,7 +25,7 @@ public sealed class ManagerWorkflowCharacterizationTests
                 {
                     WorkItemId = workItem.Id,
                     ManagerNote = "Approved in characterization test"
-                });
+                }, 9001);
 
             Assert.True(result.IsSuccess);
             Assert.Equal(WorkflowStatus.Approved, workItem.WorkflowStatus);
@@ -53,7 +53,7 @@ public sealed class ManagerWorkflowCharacterizationTests
                 {
                     WorkItemId = workItem.Id,
                     ManagerNote = "Please revise the analysis"
-                });
+                }, 9001);
 
             Assert.True(result.IsSuccess);
             Assert.Equal(
@@ -82,7 +82,7 @@ public sealed class ManagerWorkflowCharacterizationTests
                 {
                     WorkItemId = workItem.Id,
                     ManagerNote = " "
-                });
+                }, 9001);
 
             Assert.False(result.IsSuccess);
             Assert.Equal(
@@ -109,7 +109,7 @@ public sealed class ManagerWorkflowCharacterizationTests
                 {
                     WorkItemId = workItem.Id,
                     ManagerNote = "Should not be applied"
-                });
+                }, 9001);
 
             Assert.False(result.IsSuccess);
             Assert.Equal(WorkflowStatus.Submitted, workItem.WorkflowStatus);
@@ -135,7 +135,7 @@ public sealed class ManagerWorkflowCharacterizationTests
                 {
                     WorkItemId = workItem.Id,
                     ManagerNote = "Should not be applied"
-                });
+                }, 9001);
 
             Assert.False(result.IsSuccess);
             Assert.Equal(WorkflowStatus.Approved, workItem.WorkflowStatus);

@@ -3,6 +3,7 @@ using FlowDesk.DTOs.DepartmentManager;
 using FlowDesk.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace FlowDesk.Controllers
 {
@@ -42,7 +43,12 @@ namespace FlowDesk.Controllers
         {
             var result =
                 await _departmentManagerWorkflowService
-                    .GetInboxAsync();
+                    .GetInboxAsync(GetCurrentUserId());
+
+            if (result.IsForbidden)
+            {
+                return Forbid();
+            }
 
             if (!result.IsSuccess)
             {
@@ -60,11 +66,16 @@ namespace FlowDesk.Controllers
         {
             var result =
                 await _departmentManagerWorkflowService
-                    .GetReviewAsync(id);
+                    .GetReviewAsync(id, GetCurrentUserId());
 
             if (result.IsNotFound)
             {
                 return NotFound();
+            }
+
+            if (result.IsForbidden)
+            {
+                return Forbid();
             }
 
             if (!result.IsSuccess)
@@ -88,11 +99,18 @@ namespace FlowDesk.Controllers
 
             var result =
                 await _departmentManagerWorkflowService
-                    .ApproveRequestAsync(dto);
+                    .ApproveRequestAsync(
+                        dto,
+                        GetCurrentUserId());
 
             if (result.IsNotFound)
             {
                 return NotFound();
+            }
+
+            if (result.IsForbidden)
+            {
+                return Forbid();
             }
 
             if (!result.IsSuccess)
@@ -122,11 +140,18 @@ namespace FlowDesk.Controllers
 
             var result =
                 await _departmentManagerWorkflowService
-                    .ReturnToAnalystAsync(dto);
+                    .ReturnToAnalystAsync(
+                        dto,
+                        GetCurrentUserId());
 
             if (result.IsNotFound)
             {
                 return NotFound();
+            }
+
+            if (result.IsForbidden)
+            {
+                return Forbid();
             }
 
             if (!result.IsSuccess)
@@ -149,11 +174,18 @@ namespace FlowDesk.Controllers
         {
             var result =
                 await _departmentManagerWorkflowService
-                    .GetApprovedRequestForExportAsync(id);
+                    .GetApprovedRequestForExportAsync(
+                        id,
+                        GetCurrentUserId());
 
             if (result.IsNotFound)
             {
                 return NotFound();
+            }
+
+            if (result.IsForbidden)
+            {
+                return Forbid();
             }
 
             if (!result.IsSuccess || result.Data == null)
@@ -188,7 +220,12 @@ namespace FlowDesk.Controllers
         {
             var result =
                 await _departmentManagerWorkflowService
-                    .GetApprovedRequestsAsync();
+                    .GetApprovedRequestsAsync(GetCurrentUserId());
+
+            if (result.IsForbidden)
+            {
+                return Forbid();
+            }
 
             if (!result.IsSuccess)
             {
@@ -204,11 +241,23 @@ namespace FlowDesk.Controllers
         [HttpGet]
         public async Task<IActionResult> PendingUsers()
         {
-            var pendingUsers =
+            var result =
                 await _accountApprovalService
-                    .GetPendingUsersAsync();
+                    .GetPendingUsersAsync(GetCurrentUserId());
 
-            return View(pendingUsers);
+            if (result.IsForbidden)
+            {
+                return Forbid();
+            }
+
+            if (!result.IsSuccess || result.Data == null)
+            {
+                TempData["ErrorMessage"] = result.ErrorMessage;
+                return View(Array.Empty<
+                    FlowDesk.ViewModels.DepartmentManager.PendingUserViewModel>());
+            }
+
+            return View(result.Data);
         }
 
         [HttpPost]
@@ -217,7 +266,14 @@ namespace FlowDesk.Controllers
         {
             var result =
                 await _accountApprovalService
-                    .ApproveUserAsync(id);
+                    .ApproveUserAsync(
+                        id,
+                        GetCurrentUserId());
+
+            if (result.IsForbidden)
+            {
+                return Forbid();
+            }
 
             if (!result.IsSuccess)
             {
@@ -233,5 +289,14 @@ namespace FlowDesk.Controllers
             return RedirectToAction(nameof(PendingUsers));
         }
 
+        private int? GetCurrentUserId()
+        {
+            string? userIdValue = User.FindFirstValue(
+                ClaimTypes.NameIdentifier);
+
+            return int.TryParse(userIdValue, out int userId) && userId > 0
+                ? userId
+                : null;
+        }
     }
 }

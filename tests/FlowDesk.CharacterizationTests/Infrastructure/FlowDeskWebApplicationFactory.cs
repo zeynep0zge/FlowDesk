@@ -103,6 +103,16 @@ public sealed class FlowDeskWebApplicationFactory
         await context.Database.EnsureDeletedAsync();
         await context.Database.EnsureCreatedAsync();
         await IdentitySeeder.SeedRolesAsync(scope.ServiceProvider);
+        await TestDataSeeder.CreateUserAsync(
+            scope.ServiceProvider,
+            TestDataSeeder.UniqueEmail("default-employee"),
+            assignedRole: FlowDesk.Constants.AppRoles.Employee,
+            userId: 22);
+        await TestDataSeeder.CreateUserAsync(
+            scope.ServiceProvider,
+            TestDataSeeder.UniqueEmail("default-manager"),
+            assignedRole: FlowDesk.Constants.AppRoles.DepartmentManager,
+            userId: 9001);
         Email.Clear();
     }
 

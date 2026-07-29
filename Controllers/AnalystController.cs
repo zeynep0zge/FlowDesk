@@ -4,6 +4,7 @@ using FlowDesk.Services.Interfaces;
 using FlowDesk.ViewModels.Analyst;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace FlowDesk.Controllers
 {
@@ -33,7 +34,13 @@ namespace FlowDesk.Controllers
         public async Task<IActionResult> Inbox()
         {
             var result =
-                await _analystWorkflowService.GetInboxAsync();
+                await _analystWorkflowService.GetInboxAsync(
+                    GetCurrentUserId());
+
+            if (result.IsForbidden)
+            {
+                return Forbid();
+            }
 
             if (!result.IsSuccess || result.Data == null)
             {
@@ -51,11 +58,18 @@ namespace FlowDesk.Controllers
         public async Task<IActionResult> Review(int id)
         {
             var result =
-                await _analystWorkflowService.GetReviewAsync(id);
+                await _analystWorkflowService.GetReviewAsync(
+                    id,
+                    GetCurrentUserId());
 
             if (result.IsNotFound)
             {
                 return NotFound();
+            }
+
+            if (result.IsForbidden)
+            {
+                return Forbid();
             }
 
             if (!result.IsSuccess || result.Data == null)
@@ -76,11 +90,16 @@ namespace FlowDesk.Controllers
         {
             var result =
                 await _analystWorkflowService
-                    .StartReviewAsync(id);
+                    .StartReviewAsync(id, GetCurrentUserId());
 
             if (result.IsNotFound)
             {
                 return NotFound();
+            }
+
+            if (result.IsForbidden)
+            {
+                return Forbid();
             }
 
             if (!result.IsSuccess)
@@ -108,11 +127,18 @@ namespace FlowDesk.Controllers
 
             var result =
                 await _analystWorkflowService
-                    .SaveAnalysisAsync(dto);
+                    .SaveAnalysisAsync(
+                        dto,
+                        GetCurrentUserId());
 
             if (result.IsNotFound)
             {
                 return NotFound();
+            }
+
+            if (result.IsForbidden)
+            {
+                return Forbid();
             }
 
             if (!result.IsSuccess)
@@ -125,7 +151,9 @@ namespace FlowDesk.Controllers
 
                 var reviewResult =
                     await _analystWorkflowService
-                        .GetReviewAsync(id);
+                        .GetReviewAsync(
+                            id,
+                            GetCurrentUserId());
 
                 if (reviewResult.IsNotFound)
                 {
@@ -172,11 +200,18 @@ namespace FlowDesk.Controllers
 
             var result =
                 await _analystWorkflowService
-                    .SubmitForApprovalAsync(dto);
+                    .SubmitForApprovalAsync(
+                        dto,
+                        GetCurrentUserId());
 
             if (result.IsNotFound)
             {
                 return NotFound();
+            }
+
+            if (result.IsForbidden)
+            {
+                return Forbid();
             }
 
             if (!result.IsSuccess)
@@ -189,7 +224,9 @@ namespace FlowDesk.Controllers
 
                 var reviewResult =
                     await _analystWorkflowService
-                        .GetReviewAsync(id);
+                        .GetReviewAsync(
+                            id,
+                            GetCurrentUserId());
 
                 if (reviewResult.IsNotFound)
                 {
@@ -229,7 +266,13 @@ namespace FlowDesk.Controllers
         {
             var result =
                 await _analystWorkflowService
-                    .GetReturnedRequestsAsync();
+                    .GetReturnedRequestsAsync(
+                        GetCurrentUserId());
+
+            if (result.IsForbidden)
+            {
+                return Forbid();
+            }
 
             if (!result.IsSuccess || result.Data == null)
             {
@@ -245,11 +288,20 @@ namespace FlowDesk.Controllers
             return View(result.Data);
         }
 
+        private int? GetCurrentUserId()
+        {
+            string? userIdValue = User.FindFirstValue(
+                ClaimTypes.NameIdentifier);
+
+            return int.TryParse(userIdValue, out int userId) && userId > 0
+                ? userId
+                : null;
+        }
+
         private static void ApplyPostedValues(
             AnalystReviewViewModel viewModel,
             SaveAnalysisDto dto)
         {
-            viewModel.AnalystId = dto.AnalystId;
             viewModel.DeveloperId = dto.DeveloperId;
             viewModel.ReleaseDate = dto.ReleaseDate;
 

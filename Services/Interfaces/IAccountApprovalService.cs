@@ -5,9 +5,11 @@ namespace FlowDesk.Services.Interfaces
 {
     public interface IAccountApprovalService
     {
-        Task<IReadOnlyList<PendingUserViewModel>>
-            GetPendingUsersAsync();
+        Task<ServiceResult<IReadOnlyList<PendingUserViewModel>>>
+            GetPendingUsersAsync(int? managerUserId);
 
-        Task<ServiceResult> ApproveUserAsync(int userId);
+        Task<ServiceResult> ApproveUserAsync(
+            int userId,
+            int? managerUserId);
     }
 }

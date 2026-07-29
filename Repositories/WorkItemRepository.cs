@@ -15,20 +15,13 @@ namespace FlowDesk.Repositories
         }
 
         public async Task<List<WorkItem>>
-            GetProjectManagerRequestsAsync(int? currentUserId)
+            GetProjectManagerRequestsAsync(int currentUserId)
         {
-            IQueryable<WorkItem> query = _context.WorkItems
+            return await _context.WorkItems
                 .AsNoTracking()
-                .OrderByDescending(x => x.CreatedAt);
-
-            if (currentUserId.HasValue)
-            {
-                query = query.Where(
-                    x => x.CreatedByUserId == currentUserId.Value
-                );
-            }
-
-            return await query.ToListAsync();
+                .Where(x => x.CreatedByUserId == currentUserId)
+                .OrderByDescending(x => x.CreatedAt)
+                .ToListAsync();
         }
 
         public async Task<bool> RequestNumberExistsAsync(
@@ -52,57 +45,89 @@ namespace FlowDesk.Repositories
             _context.WorkItems.Remove(workItem);
         }
 
-        public async Task<List<WorkItem>> GetAnalystInboxAsync()
+        public async Task<List<WorkItem>>
+            GetAnalystInboxAsync(int currentAnalystId)
         {
             return await _context.WorkItems
                 .AsNoTracking()
                 .Where(x =>
                     x.WorkflowStatus == WorkflowStatus.Submitted ||
-                    x.WorkflowStatus == WorkflowStatus.UnderAnalystReview)
+                    (x.WorkflowStatus ==
+                         WorkflowStatus.UnderAnalystReview &&
+                     x.AnalystId == currentAnalystId))
                 .OrderByDescending(x => x.CreatedAt)
                 .ToListAsync();
         }
 
-        public async Task<List<WorkItem>> GetReturnedRequestsAsync()
+        public async Task<List<WorkItem>>
+            GetReturnedRequestsAsync(int currentAnalystId)
         {
             return await _context.WorkItems
                 .AsNoTracking()
                 .Where(x =>
-                    x.WorkflowStatus == WorkflowStatus.ReturnedToAnalyst)
+                    x.WorkflowStatus ==
+                        WorkflowStatus.ReturnedToAnalyst &&
+                    x.AnalystId == currentAnalystId)
                 .OrderByDescending(x => x.UpdatedAt ?? x.CreatedAt)
                 .ToListAsync();
         }
 
-        public async Task<int> GetReturnedRequestsCountAsync()
+        public async Task<int>
+            GetReturnedRequestsCountAsync(int currentAnalystId)
         {
             return await _context.WorkItems
                 .AsNoTracking()
                 .CountAsync(x =>
-                    x.WorkflowStatus == WorkflowStatus.ReturnedToAnalyst);
+                    x.WorkflowStatus ==
+                        WorkflowStatus.ReturnedToAnalyst &&
+                    x.AnalystId == currentAnalystId);
         }
 
         public async Task<List<WorkItem>>
-            GetWaitingManagerApprovalAsync()
+            GetWaitingManagerApprovalAsync(string department)
         {
             return await _context.WorkItems
                 .AsNoTracking()
                 .Where(x =>
                     x.WorkflowStatus ==
-                    WorkflowStatus.WaitingManagerApproval)
+                        WorkflowStatus.WaitingManagerApproval &&
+                    x.Department == department)
                 .OrderByDescending(x => x.UpdatedAt ?? x.CreatedAt)
                 .ToListAsync();
         }
 
         public async Task<List<WorkItem>>
-            GetApprovedRequestsAsync()
+            GetApprovedRequestsAsync(string department)
         {
             return await _context.WorkItems
                 .AsNoTracking()
                 .Where(x =>
                     x.WorkflowStatus ==
-                    WorkflowStatus.Approved)
+                        WorkflowStatus.Approved &&
+                    x.Department == department)
                 .OrderByDescending(x => x.UpdatedAt ?? x.CreatedAt)
                 .ToListAsync();
+        }
+
+        public async Task<WorkItem?> GetByIdInDepartmentAsync(
+            int id,
+            string department)
+        {
+            return await _context.WorkItems.FirstOrDefaultAsync(
+                x => x.Id == id &&
+                     x.Department == department);
+        }
+
+        public async Task<WorkItem?>
+            GetByIdInDepartmentAsNoTrackingAsync(
+                int id,
+                string department)
+        {
+            return await _context.WorkItems
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    x => x.Id == id &&
+                         x.Department == department);
         }
 
         public async Task<WorkItem?> GetByIdAsync(int id)

@@ -28,6 +28,11 @@ namespace FlowDesk.Controllers
                 await _workItemService.GetMyRequestsAsync(
                     GetCurrentUserId());
 
+            if (!result.IsSuccess)
+            {
+                return HandleWorkItemFailure(result);
+            }
+
             return View(result.Data!);
         }
 
@@ -54,6 +59,13 @@ namespace FlowDesk.Controllers
             WorkItem workItem
         )
         {
+            int? currentUserId = GetCurrentUserId();
+
+            if (!currentUserId.HasValue)
+            {
+                return Forbid();
+            }
+
             ServiceResult<string> validationResult =
                 await _workItemService.ValidateCreateAsync(
                     workItem.RequestNumber);
@@ -77,7 +89,7 @@ namespace FlowDesk.Controllers
                 await _workItemService.CreateAsync(
                     workItem,
                     validationResult.Data!,
-                    GetCurrentUserId());
+                    currentUserId);
 
             if (!createResult.IsSuccess)
             {
@@ -252,7 +264,7 @@ namespace FlowDesk.Controllers
                 ClaimTypes.NameIdentifier
             );
 
-            if (int.TryParse(userIdValue, out int userId))
+            if (int.TryParse(userIdValue, out int userId) && userId > 0)
             {
                 return userId;
             }
