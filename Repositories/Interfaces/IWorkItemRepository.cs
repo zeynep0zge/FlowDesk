@@ -5,7 +5,7 @@ namespace FlowDesk.Repositories.Interfaces
     public interface IWorkItemRepository
     {
         Task<List<WorkItem>>
-            GetProjectManagerRequestsAsync(int? currentUserId);
+            GetProjectManagerRequestsAsync(int currentUserId);
 
         Task<bool> RequestNumberExistsAsync(
             string requestNumber,
@@ -15,17 +15,28 @@ namespace FlowDesk.Repositories.Interfaces
 
         void Remove(WorkItem workItem);
 
-        Task<List<WorkItem>> GetAnalystInboxAsync();
-
-        Task<List<WorkItem>> GetReturnedRequestsAsync();
-
-        Task<int> GetReturnedRequestsCountAsync();
+        Task<List<WorkItem>>
+            GetAnalystInboxAsync(int currentAnalystId);
 
         Task<List<WorkItem>>
-            GetWaitingManagerApprovalAsync();
+            GetReturnedRequestsAsync(int currentAnalystId);
+
+        Task<int>
+            GetReturnedRequestsCountAsync(int currentAnalystId);
 
         Task<List<WorkItem>>
-            GetApprovedRequestsAsync();
+            GetWaitingManagerApprovalAsync(string department);
+
+        Task<List<WorkItem>>
+            GetApprovedRequestsAsync(string department);
+
+        Task<WorkItem?> GetByIdInDepartmentAsync(
+            int id,
+            string department);
+
+        Task<WorkItem?> GetByIdInDepartmentAsNoTrackingAsync(
+            int id,
+            string department);
 
         Task<WorkItem?> GetByIdAsync(int id);
 

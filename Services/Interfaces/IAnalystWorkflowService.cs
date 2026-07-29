@@ -9,21 +9,25 @@ namespace FlowDesk.Services.Interfaces
     public interface IAnalystWorkflowService
     {
         Task<ServiceResult<AnalystInboxViewModel>>
-            GetInboxAsync();
+            GetInboxAsync(int? currentAnalystId);
 
         Task<ServiceResult<List<AnalystInboxItemViewModel>>>
-            GetReturnedRequestsAsync();
+            GetReturnedRequestsAsync(int? currentAnalystId);
 
         Task<ServiceResult<AnalystReviewViewModel>>
-            GetReviewAsync(int id);
+            GetReviewAsync(int id, int? currentAnalystId);
 
         Task<ServiceResult>
-            StartReviewAsync(int id);
+            StartReviewAsync(int id, int? currentAnalystId);
 
         Task<ServiceResult<AnalystReviewViewModel>>
-            SaveAnalysisAsync(SaveAnalysisDto dto);
+            SaveAnalysisAsync(
+                SaveAnalysisDto dto,
+                int? currentAnalystId);
 
         Task<ServiceResult>
-            SubmitForApprovalAsync(SubmitForApprovalDto dto);
+            SubmitForApprovalAsync(
+                SubmitForApprovalDto dto,
+                int? currentAnalystId);
     }
 }

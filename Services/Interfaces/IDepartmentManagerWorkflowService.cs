@@ -7,21 +7,27 @@ namespace FlowDesk.Services.Interfaces
     public interface IDepartmentManagerWorkflowService
     {
         Task<ServiceResult<ManagerInboxViewModel>>
-            GetInboxAsync();
+            GetInboxAsync(int? managerUserId);
 
         Task<ServiceResult<ManagerReviewViewModel>>
-            GetReviewAsync(int id);
+            GetReviewAsync(int id, int? managerUserId);
 
         Task<ServiceResult>
-            ApproveRequestAsync(ApproveRequestDto dto);
+            ApproveRequestAsync(
+                ApproveRequestDto dto,
+                int? managerUserId);
 
         Task<ServiceResult>
-            ReturnToAnalystAsync(ReturnToAnalystDto dto);
+            ReturnToAnalystAsync(
+                ReturnToAnalystDto dto,
+                int? managerUserId);
 
         Task<ServiceResult<List<ManagerInboxItemViewModel>>>
-            GetApprovedRequestsAsync();
+            GetApprovedRequestsAsync(int? managerUserId);
 
         Task<ServiceResult<ManagerReviewViewModel>>
-            GetApprovedRequestForExportAsync(int id);
+            GetApprovedRequestForExportAsync(
+                int id,
+                int? managerUserId);
     }
 }

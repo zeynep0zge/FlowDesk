@@ -25,17 +25,20 @@ public static class TestDataSeeder
         bool emailConfirmed = true,
         bool isApproved = true,
         string? requestedRole = null,
-        string? assignedRole = null)
+        string? assignedRole = null,
+        string? department = null,
+        int? userId = null)
     {
         UserManager<ApplicationUser> userManager =
             services.GetRequiredService<UserManager<ApplicationUser>>();
 
         ApplicationUser user = new()
         {
+            Id = userId.GetValueOrDefault(),
             UserName = email,
             Email = email,
             FullName = "Characterization Test User",
-            Department = DefaultDepartment,
+            Department = department ?? DefaultDepartment,
             RequestedRole = requestedRole,
             EmailConfirmed = emailConfirmed,
             IsApproved = isApproved,
@@ -71,7 +74,9 @@ public static class TestDataSeeder
     public static async Task<WorkItem> CreateWorkItemAsync(
         IServiceProvider services,
         WorkflowStatus workflowStatus,
-        int? createdByUserId = 101)
+        int? createdByUserId = 101,
+        string? department = null,
+        int? analystId = null)
     {
         AppDbContext context =
             services.GetRequiredService<AppDbContext>();
@@ -80,9 +85,10 @@ public static class TestDataSeeder
         {
             RequestNumber = UniqueRequestNumber("REQ"),
             RequestDescription = "Characterization test request",
-            Department = DefaultDepartment,
+            Department = department ?? DefaultDepartment,
             Priority = RequestPriority.Normal,
             CreatedByUserId = createdByUserId,
+            AnalystId = analystId,
             WorkflowStatus = workflowStatus,
             CurrentStatus = workflowStatus.ToString(),
             CreatedAt = DateTime.UtcNow

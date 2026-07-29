@@ -20,7 +20,7 @@ public sealed class AnalystWorkflowCharacterizationTests
             IAnalystWorkflowService service =
                 services.GetRequiredService<IAnalystWorkflowService>();
 
-            var result = await service.StartReviewAsync(workItem.Id);
+            var result = await service.StartReviewAsync(workItem.Id, 11);
 
             Assert.True(result.IsSuccess);
             Assert.Equal(
@@ -37,7 +37,8 @@ public sealed class AnalystWorkflowCharacterizationTests
         {
             WorkItem workItem = await TestDataSeeder.CreateWorkItemAsync(
                 services,
-                WorkflowStatus.UnderAnalystReview);
+                WorkflowStatus.UnderAnalystReview,
+                analystId: 11);
             IAnalystWorkflowService service =
                 services.GetRequiredService<IAnalystWorkflowService>();
             DateTime releaseDate = new(2026, 9, 20);
@@ -54,7 +55,8 @@ public sealed class AnalystWorkflowCharacterizationTests
                     ExpectedStatus = "Sürüme Hazır",
                     CurrentStatus = "Analist İncelemesinde",
                     AnalystNote = "Test analysis note"
-                });
+                },
+                11);
 
             Assert.True(result.IsSuccess);
             Assert.Equal(11, workItem.AnalystId);
@@ -105,12 +107,14 @@ public sealed class AnalystWorkflowCharacterizationTests
         {
             WorkItem workItem = await TestDataSeeder.CreateWorkItemAsync(
                 services,
-                WorkflowStatus.UnderAnalystReview);
+                WorkflowStatus.UnderAnalystReview,
+                analystId: 11);
             IAnalystWorkflowService service =
                 services.GetRequiredService<IAnalystWorkflowService>();
 
             var result = await service.SubmitForApprovalAsync(
-                CompleteSubmitDto(workItem.Id));
+                CompleteSubmitDto(workItem.Id),
+                11);
 
             Assert.True(result.IsSuccess);
             Assert.Equal(
@@ -129,7 +133,8 @@ public sealed class AnalystWorkflowCharacterizationTests
         {
             WorkItem workItem = await TestDataSeeder.CreateWorkItemAsync(
                 services,
-                WorkflowStatus.UnderAnalystReview);
+                WorkflowStatus.UnderAnalystReview,
+                analystId: 11);
             IAnalystWorkflowService service =
                 services.GetRequiredService<IAnalystWorkflowService>();
 
@@ -138,7 +143,8 @@ public sealed class AnalystWorkflowCharacterizationTests
                 {
                     WorkItemId = workItem.Id,
                     AnalystId = 11
-                });
+                },
+                11);
 
             Assert.False(result.IsSuccess);
             Assert.Equal(
@@ -154,7 +160,8 @@ public sealed class AnalystWorkflowCharacterizationTests
         {
             WorkItem returned = await TestDataSeeder.CreateWorkItemAsync(
                 services,
-                WorkflowStatus.ReturnedToAnalyst);
+                WorkflowStatus.ReturnedToAnalyst,
+                analystId: 11);
             WorkItem submitted = await TestDataSeeder.CreateWorkItemAsync(
                 services,
                 WorkflowStatus.Submitted);
@@ -162,9 +169,9 @@ public sealed class AnalystWorkflowCharacterizationTests
                 services.GetRequiredService<IWorkItemRepository>();
 
             List<WorkItem> returnedItems =
-                await repository.GetReturnedRequestsAsync();
+                await repository.GetReturnedRequestsAsync(11);
             List<WorkItem> inboxItems =
-                await repository.GetAnalystInboxAsync();
+                await repository.GetAnalystInboxAsync(11);
 
             Assert.Contains(returnedItems, x => x.Id == returned.Id);
             Assert.DoesNotContain(inboxItems, x => x.Id == returned.Id);
@@ -179,7 +186,8 @@ public sealed class AnalystWorkflowCharacterizationTests
         {
             WorkItem workItem = await TestDataSeeder.CreateWorkItemAsync(
                 services,
-                WorkflowStatus.UnderAnalystReview);
+                WorkflowStatus.UnderAnalystReview,
+                analystId: 11);
             IAnalystWorkflowService service =
                 services.GetRequiredService<IAnalystWorkflowService>();
             SaveAnalysisDto dto = new()
@@ -195,10 +203,10 @@ public sealed class AnalystWorkflowCharacterizationTests
             };
             makeInvalid(dto);
 
-            var result = await service.SaveAnalysisAsync(dto);
+            var result = await service.SaveAnalysisAsync(dto, 11);
 
             Assert.False(result.IsSuccess);
-            Assert.Null(workItem.AnalystId);
+            Assert.Equal(11, workItem.AnalystId);
             Assert.Null(workItem.DeveloperId);
             Assert.Null(workItem.ReleaseDate);
             Assert.Null(workItem.BanksoftDeliveryDate);

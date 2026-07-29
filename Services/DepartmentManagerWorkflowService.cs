@@ -1,9 +1,11 @@
 ﻿using FlowDesk.Common;
 using FlowDesk.DTOs.DepartmentManager;
+using FlowDesk.Constants;
 using FlowDesk.Models;
 using FlowDesk.Repositories.Interfaces;
 using FlowDesk.Services.Interfaces;
 using FlowDesk.ViewModels.DepartmentManager;
+using Microsoft.AspNetCore.Identity;
 
 namespace FlowDesk.Services
 {
@@ -11,19 +13,32 @@ namespace FlowDesk.Services
         : IDepartmentManagerWorkflowService
     {
         private readonly IWorkItemRepository _workItemRepository;
+        private readonly UserManager<ApplicationUser> _userManager;
 
         public DepartmentManagerWorkflowService(
-            IWorkItemRepository workItemRepository)
+            IWorkItemRepository workItemRepository,
+            UserManager<ApplicationUser> userManager)
         {
             _workItemRepository = workItemRepository;
+            _userManager = userManager;
         }
 
         public async Task<ServiceResult<ManagerInboxViewModel>>
-            GetInboxAsync()
+            GetInboxAsync(int? managerUserId)
         {
+            ServiceResult<string> departmentResult =
+                await GetManagerDepartmentAsync(managerUserId);
+
+            if (!departmentResult.IsSuccess)
+            {
+                return ServiceResult<ManagerInboxViewModel>.Forbidden(
+                    departmentResult.ErrorMessage!);
+            }
+
             List<WorkItem> workItems =
                 await _workItemRepository
-                    .GetWaitingManagerApprovalAsync();
+                    .GetWaitingManagerApprovalAsync(
+                        departmentResult.Data!);
 
             ManagerInboxViewModel viewModel = new()
             {
@@ -36,8 +51,19 @@ namespace FlowDesk.Services
                 .Success(viewModel);
         }
         public async Task<ServiceResult<ManagerReviewViewModel>>
-                GetApprovedRequestForExportAsync(int id)
+                GetApprovedRequestForExportAsync(
+                    int id,
+                    int? managerUserId)
         {
+            ServiceResult<string> departmentResult =
+                await GetManagerDepartmentAsync(managerUserId);
+
+            if (!departmentResult.IsSuccess)
+            {
+                return ServiceResult<ManagerReviewViewModel>.Forbidden(
+                    departmentResult.ErrorMessage!);
+            }
+
             if (id <= 0)
             {
                 return ServiceResult<ManagerReviewViewModel>
@@ -45,7 +71,10 @@ namespace FlowDesk.Services
             }
 
             WorkItem? workItem =
-                await _workItemRepository.GetByIdAsNoTrackingAsync(id);
+                await _workItemRepository
+                    .GetByIdInDepartmentAsNoTrackingAsync(
+                        id,
+                        departmentResult.Data!);
 
             if (workItem == null)
             {
@@ -63,8 +92,17 @@ namespace FlowDesk.Services
                 .Success(MapToReviewViewModel(workItem));
         }
         public async Task<ServiceResult<ManagerReviewViewModel>>
-            GetReviewAsync(int id)
+            GetReviewAsync(int id, int? managerUserId)
         {
+            ServiceResult<string> departmentResult =
+                await GetManagerDepartmentAsync(managerUserId);
+
+            if (!departmentResult.IsSuccess)
+            {
+                return ServiceResult<ManagerReviewViewModel>.Forbidden(
+                    departmentResult.ErrorMessage!);
+            }
+
             if (id <= 0)
             {
                 return ServiceResult<ManagerReviewViewModel>
@@ -73,7 +111,9 @@ namespace FlowDesk.Services
 
             WorkItem? workItem =
                 await _workItemRepository
-                    .GetByIdAsNoTrackingAsync(id);
+                    .GetByIdInDepartmentAsNoTrackingAsync(
+                        id,
+                        departmentResult.Data!);
 
             if (workItem == null)
             {
@@ -98,8 +138,19 @@ namespace FlowDesk.Services
         }
 
         public async Task<ServiceResult>
-            ApproveRequestAsync(ApproveRequestDto dto)
+            ApproveRequestAsync(
+                ApproveRequestDto dto,
+                int? managerUserId)
         {
+            ServiceResult<string> departmentResult =
+                await GetManagerDepartmentAsync(managerUserId);
+
+            if (!departmentResult.IsSuccess)
+            {
+                return ServiceResult.Forbidden(
+                    departmentResult.ErrorMessage!);
+            }
+
             if (dto.WorkItemId <= 0)
             {
                 return ServiceResult.Failure(
@@ -109,7 +160,9 @@ namespace FlowDesk.Services
 
             WorkItem? workItem =
                 await _workItemRepository
-                    .GetByIdAsync(dto.WorkItemId);
+                    .GetByIdInDepartmentAsync(
+                        dto.WorkItemId,
+                        departmentResult.Data!);
 
             if (workItem == null)
             {
@@ -154,8 +207,19 @@ namespace FlowDesk.Services
         }
 
         public async Task<ServiceResult>
-            ReturnToAnalystAsync(ReturnToAnalystDto dto)
+            ReturnToAnalystAsync(
+                ReturnToAnalystDto dto,
+                int? managerUserId)
         {
+            ServiceResult<string> departmentResult =
+                await GetManagerDepartmentAsync(managerUserId);
+
+            if (!departmentResult.IsSuccess)
+            {
+                return ServiceResult.Forbidden(
+                    departmentResult.ErrorMessage!);
+            }
+
             if (dto.WorkItemId <= 0)
             {
                 return ServiceResult.Failure(
@@ -184,7 +248,9 @@ namespace FlowDesk.Services
 
             WorkItem? workItem =
                 await _workItemRepository
-                    .GetByIdAsync(dto.WorkItemId);
+                    .GetByIdInDepartmentAsync(
+                        dto.WorkItemId,
+                        departmentResult.Data!);
 
             if (workItem == null)
             {
@@ -217,11 +283,22 @@ namespace FlowDesk.Services
 
         public async Task<
             ServiceResult<List<ManagerInboxItemViewModel>>>
-            GetApprovedRequestsAsync()
+            GetApprovedRequestsAsync(int? managerUserId)
         {
+            ServiceResult<string> departmentResult =
+                await GetManagerDepartmentAsync(managerUserId);
+
+            if (!departmentResult.IsSuccess)
+            {
+                return ServiceResult<
+                    List<ManagerInboxItemViewModel>>.Forbidden(
+                        departmentResult.ErrorMessage!);
+            }
+
             List<WorkItem> workItems =
                 await _workItemRepository
-                    .GetApprovedRequestsAsync();
+                    .GetApprovedRequestsAsync(
+                        departmentResult.Data!);
 
             List<ManagerInboxItemViewModel> viewModels =
                 workItems
@@ -231,6 +308,31 @@ namespace FlowDesk.Services
             return ServiceResult<
                 List<ManagerInboxItemViewModel>>
                 .Success(viewModels);
+        }
+
+        private async Task<ServiceResult<string>>
+            GetManagerDepartmentAsync(int? managerUserId)
+        {
+            if (!managerUserId.HasValue || managerUserId.Value <= 0)
+            {
+                return ServiceResult<string>.Forbidden(
+                    "Gecerli departman yoneticisi kimligi bulunamadi.");
+            }
+
+            ApplicationUser? manager = await _userManager.FindByIdAsync(
+                managerUserId.Value.ToString());
+
+            if (manager == null ||
+                !DepartmentOptions.Contains(manager.Department) ||
+                !await _userManager.IsInRoleAsync(
+                    manager,
+                    AppRoles.DepartmentManager))
+            {
+                return ServiceResult<string>.Forbidden(
+                    "Departman yoneticisi departmani gecersiz.");
+            }
+
+            return ServiceResult<string>.Success(manager.Department!);
         }
 
         private static ManagerInboxItemViewModel

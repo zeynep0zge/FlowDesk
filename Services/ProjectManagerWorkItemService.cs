@@ -34,9 +34,16 @@ namespace FlowDesk.Services
         public async Task<ServiceResult<List<WorkItem>>>
             GetMyRequestsAsync(int? currentUserId)
         {
+            if (!IsValidUserId(currentUserId))
+            {
+                return ServiceResult<List<WorkItem>>.Forbidden(
+                    ForbiddenMessage);
+            }
+
             List<WorkItem> workItems =
                 await _workItemRepository
-                    .GetProjectManagerRequestsAsync(currentUserId);
+                    .GetProjectManagerRequestsAsync(
+                        currentUserId.GetValueOrDefault());
 
             return ServiceResult<List<WorkItem>>
                 .Success(workItems);
@@ -88,11 +95,16 @@ namespace FlowDesk.Services
             string normalizedRequestNumber,
             int? currentUserId)
         {
+            if (!IsValidUserId(currentUserId))
+            {
+                return ServiceResult.Forbidden(ForbiddenMessage);
+            }
+
             workItem.RequestNumber = normalizedRequestNumber;
             workItem.RequestDescription =
                 workItem.RequestDescription.Trim();
             workItem.Department = workItem.Department.Trim();
-            workItem.CreatedByUserId = currentUserId;
+            workItem.CreatedByUserId = currentUserId.GetValueOrDefault();
             workItem.WorkflowStatus = WorkflowStatus.Submitted;
             workItem.CurrentStatus =
                 "Analist İncelemesi Bekliyor";
@@ -258,9 +270,14 @@ namespace FlowDesk.Services
             WorkItem workItem,
             int? currentUserId)
         {
-            return currentUserId.HasValue &&
-                   workItem.CreatedByUserId.HasValue &&
-                   workItem.CreatedByUserId != currentUserId;
+            return !IsValidUserId(currentUserId) ||
+                   workItem.CreatedByUserId !=
+                       currentUserId.GetValueOrDefault();
+        }
+
+        private static bool IsValidUserId(int? currentUserId)
+        {
+            return currentUserId.HasValue && currentUserId.Value > 0;
         }
     }
 }

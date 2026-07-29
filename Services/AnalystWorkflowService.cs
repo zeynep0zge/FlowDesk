@@ -1,32 +1,45 @@
 using FlowDesk.Common;
+using FlowDesk.Constants;
 using FlowDesk.DTOs.Analyst;
 using FlowDesk.Models;
 using FlowDesk.Repositories.Interfaces;
 using FlowDesk.Services.Interfaces;
 using FlowDesk.ViewModels.Analyst;
 using FlowDesk.ViewModels.DepartmentManager;
+using Microsoft.AspNetCore.Identity;
 
 namespace FlowDesk.Services
 {
     public class AnalystWorkflowService : IAnalystWorkflowService
     {
         private readonly IWorkItemRepository _workItemRepository;
+        private readonly UserManager<ApplicationUser> _userManager;
 
         public AnalystWorkflowService(
-            IWorkItemRepository workItemRepository)
+            IWorkItemRepository workItemRepository,
+            UserManager<ApplicationUser> userManager)
         {
             _workItemRepository = workItemRepository;
+            _userManager = userManager;
         }
 
         public async Task<ServiceResult<AnalystInboxViewModel>>
-            GetInboxAsync()
+            GetInboxAsync(int? currentAnalystId)
         {
+            if (!IsValidUserId(currentAnalystId))
+            {
+                return ServiceResult<AnalystInboxViewModel>.Forbidden(
+                    "Gecerli analist kimligi bulunamadi.");
+            }
+
             List<WorkItem> workItems =
-                await _workItemRepository.GetAnalystInboxAsync();
+                await _workItemRepository.GetAnalystInboxAsync(
+                    currentAnalystId.GetValueOrDefault());
 
             int returnedCount =
                 await _workItemRepository
-                    .GetReturnedRequestsCountAsync();
+                    .GetReturnedRequestsCountAsync(
+                        currentAnalystId.GetValueOrDefault());
 
             AnalystInboxViewModel viewModel = new()
             {
@@ -43,10 +56,18 @@ namespace FlowDesk.Services
 
         public async Task<
             ServiceResult<List<AnalystInboxItemViewModel>>>
-            GetReturnedRequestsAsync()
+            GetReturnedRequestsAsync(int? currentAnalystId)
         {
+            if (!IsValidUserId(currentAnalystId))
+            {
+                return ServiceResult<
+                    List<AnalystInboxItemViewModel>>.Forbidden(
+                        "Gecerli analist kimligi bulunamadi.");
+            }
+
             List<WorkItem> workItems =
-                await _workItemRepository.GetReturnedRequestsAsync();
+                await _workItemRepository.GetReturnedRequestsAsync(
+                    currentAnalystId.GetValueOrDefault());
 
             List<AnalystInboxItemViewModel> viewModels =
                 workItems
@@ -58,8 +79,14 @@ namespace FlowDesk.Services
         }
 
         public async Task<ServiceResult<AnalystReviewViewModel>>
-            GetReviewAsync(int id)
+            GetReviewAsync(int id, int? currentAnalystId)
         {
+            if (!IsValidUserId(currentAnalystId))
+            {
+                return ServiceResult<AnalystReviewViewModel>.Forbidden(
+                    "Gecerli analist kimligi bulunamadi.");
+            }
+
             if (id <= 0)
             {
                 return ServiceResult<AnalystReviewViewModel>
@@ -74,6 +101,13 @@ namespace FlowDesk.Services
             {
                 return ServiceResult<AnalystReviewViewModel>
                     .NotFound("Talep bulunamadı.");
+            }
+
+            if (workItem.AnalystId !=
+                currentAnalystId.GetValueOrDefault())
+            {
+                return ServiceResult<AnalystReviewViewModel>.Forbidden(
+                    "Bu talebe erisim yetkiniz bulunmuyor.");
             }
 
             if (!CanAnalystEdit(workItem.WorkflowStatus))
@@ -92,8 +126,16 @@ namespace FlowDesk.Services
                 .Success(viewModel);
         }
 
-        public async Task<ServiceResult> StartReviewAsync(int id)
+        public async Task<ServiceResult> StartReviewAsync(
+            int id,
+            int? currentAnalystId)
         {
+            if (!IsValidUserId(currentAnalystId))
+            {
+                return ServiceResult.Forbidden(
+                    "Gecerli analist kimligi bulunamadi.");
+            }
+
             if (id <= 0)
             {
                 return ServiceResult.Failure(
@@ -111,6 +153,23 @@ namespace FlowDesk.Services
                 );
             }
 
+            if (workItem.WorkflowStatus != WorkflowStatus.Submitted &&
+                workItem.AnalystId !=
+                    currentAnalystId.GetValueOrDefault())
+            {
+                return ServiceResult.Forbidden(
+                    "Bu talebe erisim yetkiniz bulunmuyor.");
+            }
+
+            if (workItem.WorkflowStatus == WorkflowStatus.Submitted &&
+                workItem.AnalystId.HasValue &&
+                workItem.AnalystId !=
+                    currentAnalystId.GetValueOrDefault())
+            {
+                return ServiceResult.Forbidden(
+                    "Bu talep baska bir analist tarafindan sahiplenilmis.");
+            }
+
             if (!CanAnalystEdit(workItem.WorkflowStatus))
             {
                 return ServiceResult.Failure(
@@ -122,6 +181,8 @@ namespace FlowDesk.Services
             if (workItem.WorkflowStatus ==
                 WorkflowStatus.Submitted)
             {
+                workItem.AnalystId =
+                    currentAnalystId.GetValueOrDefault();
                 workItem.WorkflowStatus =
                     WorkflowStatus.UnderAnalystReview;
 
@@ -137,8 +198,16 @@ namespace FlowDesk.Services
         }
 
         public async Task<ServiceResult<AnalystReviewViewModel>>
-            SaveAnalysisAsync(SaveAnalysisDto dto)
+            SaveAnalysisAsync(
+                SaveAnalysisDto dto,
+                int? currentAnalystId)
         {
+            if (!IsValidUserId(currentAnalystId))
+            {
+                return ServiceResult<AnalystReviewViewModel>.Forbidden(
+                    "Gecerli analist kimligi bulunamadi.");
+            }
+
             if (dto.WorkItemId <= 0)
             {
                 return ServiceResult<AnalystReviewViewModel>
@@ -153,6 +222,13 @@ namespace FlowDesk.Services
             {
                 return ServiceResult<AnalystReviewViewModel>
                     .NotFound("Talep bulunamadı.");
+            }
+
+            if (workItem.AnalystId !=
+                currentAnalystId.GetValueOrDefault())
+            {
+                return ServiceResult<AnalystReviewViewModel>.Forbidden(
+                    "Bu talebi degistirme yetkiniz bulunmuyor.");
             }
 
             if (!CanAnalystEdit(workItem.WorkflowStatus))
@@ -219,7 +295,19 @@ namespace FlowDesk.Services
                     );
             }
 
-            workItem.AnalystId = dto.AnalystId;
+            ServiceResult developerResult =
+                await ValidateDeveloperAsync(
+                    dto.DeveloperId,
+                    workItem.Department);
+
+            if (!developerResult.IsSuccess)
+            {
+                return ServiceResult<AnalystReviewViewModel>.Failure(
+                    developerResult.ErrorMessage!);
+            }
+
+            workItem.AnalystId =
+                currentAnalystId.GetValueOrDefault();
             workItem.DeveloperId = dto.DeveloperId;
             workItem.ReleaseDate = dto.ReleaseDate;
 
@@ -248,8 +336,17 @@ namespace FlowDesk.Services
 
         public async Task<ServiceResult>
             SubmitForApprovalAsync(
-                SubmitForApprovalDto dto)
+                SubmitForApprovalDto dto,
+                int? currentAnalystId)
         {
+            if (!IsValidUserId(currentAnalystId))
+            {
+                return ServiceResult.Forbidden(
+                    "Gecerli analist kimligi bulunamadi.");
+            }
+
+            dto.AnalystId = currentAnalystId.GetValueOrDefault();
+
             if (dto.WorkItemId <= 0)
             {
                 return ServiceResult.Failure(
@@ -266,6 +363,13 @@ namespace FlowDesk.Services
                 return ServiceResult.NotFound(
                     "Talep bulunamadı."
                 );
+            }
+
+            if (workItem.AnalystId !=
+                currentAnalystId.GetValueOrDefault())
+            {
+                return ServiceResult.Forbidden(
+                    "Bu talebi gonderme yetkiniz bulunmuyor.");
             }
 
             if (workItem.WorkflowStatus ==
@@ -373,7 +477,18 @@ namespace FlowDesk.Services
                 );
             }
 
-            workItem.AnalystId = dto.AnalystId;
+            ServiceResult developerResult =
+                await ValidateDeveloperAsync(
+                    dto.DeveloperId,
+                    workItem.Department);
+
+            if (!developerResult.IsSuccess)
+            {
+                return developerResult;
+            }
+
+            workItem.AnalystId =
+                currentAnalystId.GetValueOrDefault();
             workItem.DeveloperId = dto.DeveloperId;
             workItem.ReleaseDate = dto.ReleaseDate;
 
@@ -394,6 +509,41 @@ namespace FlowDesk.Services
             await _workItemRepository.SaveChangesAsync();
 
             return ServiceResult.Success();
+        }
+
+        private async Task<ServiceResult> ValidateDeveloperAsync(
+            int? developerId,
+            string workItemDepartment)
+        {
+            if (!developerId.HasValue)
+            {
+                return ServiceResult.Success();
+            }
+
+            ApplicationUser? developer = await _userManager.FindByIdAsync(
+                developerId.Value.ToString());
+
+            if (developer == null ||
+                !developer.EmailConfirmed ||
+                !developer.IsApproved ||
+                !await _userManager.IsInRoleAsync(
+                    developer,
+                    AppRoles.Employee) ||
+                !string.Equals(
+                    developer.Department,
+                    workItemDepartment,
+                    StringComparison.Ordinal))
+            {
+                return ServiceResult.Failure(
+                    "Secilen yazilimci bu talep icin yetkili degil.");
+            }
+
+            return ServiceResult.Success();
+        }
+
+        private static bool IsValidUserId(int? userId)
+        {
+            return userId.HasValue && userId.Value > 0;
         }
 
         private static bool CanAnalystEdit(

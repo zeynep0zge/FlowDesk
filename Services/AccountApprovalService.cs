@@ -19,14 +19,29 @@ namespace FlowDesk.Services
             _userManager = userManager;
         }
 
-        public async Task<IReadOnlyList<PendingUserViewModel>>
-            GetPendingUsersAsync()
+        public async Task<
+            ServiceResult<IReadOnlyList<PendingUserViewModel>>>
+            GetPendingUsersAsync(int? managerUserId)
         {
-            return await _userManager.Users
+            ServiceResult<string> departmentResult =
+                await GetManagerDepartmentAsync(managerUserId);
+
+            if (!departmentResult.IsSuccess)
+            {
+                return ServiceResult<
+                    IReadOnlyList<PendingUserViewModel>>.Forbidden(
+                        departmentResult.ErrorMessage!);
+            }
+
+            string department = departmentResult.Data!;
+
+            List<PendingUserViewModel> pendingUsers =
+                await _userManager.Users
                 .AsNoTracking()
                 .Where(user =>
                     user.EmailConfirmed &&
                     !user.IsApproved &&
+                    user.Department == department &&
                     user.RequestedRole != null &&
                     user.RequestedRole != string.Empty)
                 .OrderBy(user => user.CreatedAtUtc)
@@ -40,10 +55,25 @@ namespace FlowDesk.Services
                     CreatedAtUtc = user.CreatedAtUtc
                 })
                 .ToListAsync();
+
+            return ServiceResult<
+                IReadOnlyList<PendingUserViewModel>>.Success(
+                    pendingUsers);
         }
 
-        public async Task<ServiceResult> ApproveUserAsync(int userId)
+        public async Task<ServiceResult> ApproveUserAsync(
+            int userId,
+            int? managerUserId)
         {
+            ServiceResult<string> departmentResult =
+                await GetManagerDepartmentAsync(managerUserId);
+
+            if (!departmentResult.IsSuccess)
+            {
+                return ServiceResult.Forbidden(
+                    departmentResult.ErrorMessage!);
+            }
+
             ApplicationUser? user =
                 await _userManager.FindByIdAsync(userId.ToString());
 
@@ -51,6 +81,27 @@ namespace FlowDesk.Services
             {
                 return ServiceResult.NotFound(
                     "Kullanıcı bulunamadı.");
+            }
+
+            if (!string.Equals(
+                    user.Department,
+                    departmentResult.Data,
+                    StringComparison.Ordinal))
+            {
+                return ServiceResult.Forbidden(
+                    "Bu kullaniciyi onaylama yetkiniz bulunmuyor.");
+            }
+
+            IList<string> existingRoles =
+                await _userManager.GetRolesAsync(user);
+
+            if (existingRoles.Any(role => !string.Equals(
+                    role,
+                    user.RequestedRole,
+                    StringComparison.Ordinal)))
+            {
+                return ServiceResult.Failure(
+                    "Mevcut rol talep edilen rolle uyumlu degil.");
             }
 
             if (user.IsApproved)
@@ -67,9 +118,12 @@ namespace FlowDesk.Services
                     "onay için uygun değil.");
             }
 
-            bool alreadyInRole = await _userManager.IsInRoleAsync(
-                user,
-                user.RequestedRole!);
+            IList<string> currentRoles = existingRoles;
+
+            bool alreadyInRole = currentRoles.Any(role => string.Equals(
+                role,
+                user.RequestedRole,
+                StringComparison.Ordinal));
 
             if (!alreadyInRole)
             {
@@ -98,6 +152,31 @@ namespace FlowDesk.Services
             return ServiceResult.Success(
                 "Kullanıcı hesabı onaylandı ve " +
                 "talep edilen rol atandı.");
+        }
+
+        private async Task<ServiceResult<string>>
+            GetManagerDepartmentAsync(int? managerUserId)
+        {
+            if (!managerUserId.HasValue || managerUserId.Value <= 0)
+            {
+                return ServiceResult<string>.Forbidden(
+                    "Gecerli departman yoneticisi kimligi bulunamadi.");
+            }
+
+            ApplicationUser? manager = await _userManager.FindByIdAsync(
+                managerUserId.Value.ToString());
+
+            if (manager == null ||
+                !DepartmentOptions.Contains(manager.Department) ||
+                !await _userManager.IsInRoleAsync(
+                    manager,
+                    AppRoles.DepartmentManager))
+            {
+                return ServiceResult<string>.Forbidden(
+                    "Departman yoneticisi departmani gecersiz.");
+            }
+
+            return ServiceResult<string>.Success(manager.Department!);
         }
 
         private static string JoinIdentityErrors(
