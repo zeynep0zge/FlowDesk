@@ -113,6 +113,8 @@ public sealed class FlowDeskWebApplicationFactory
             TestDataSeeder.UniqueEmail("default-manager"),
             assignedRole: FlowDesk.Constants.AppRoles.DepartmentManager,
             userId: 9001);
+        await IdentitySeeder.BackfillBusinessCodesAsync(
+            scope.ServiceProvider);
         Email.Clear();
     }
 

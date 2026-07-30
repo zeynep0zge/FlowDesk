@@ -1,4 +1,4 @@
-﻿using FlowDesk.Common;
+using FlowDesk.Common;
 using FlowDesk.DTOs.DepartmentManager;
 using FlowDesk.Constants;
 using FlowDesk.Models;
@@ -26,8 +26,8 @@ namespace FlowDesk.Services
         public async Task<ServiceResult<ManagerInboxViewModel>>
             GetInboxAsync(int? managerUserId)
         {
-            ServiceResult<string> departmentResult =
-                await GetManagerDepartmentAsync(managerUserId);
+            ServiceResult<ManagerAccessScope> departmentResult =
+                await GetManagerAccessScopeAsync(managerUserId);
 
             if (!departmentResult.IsSuccess)
             {
@@ -38,7 +38,8 @@ namespace FlowDesk.Services
             List<WorkItem> workItems =
                 await _workItemRepository
                     .GetWaitingManagerApprovalAsync(
-                        departmentResult.Data!);
+                        departmentResult.Data!.Department,
+                        departmentResult.Data.CanAccessAllDepartments);
 
             ManagerInboxViewModel viewModel = new()
             {
@@ -55,8 +56,8 @@ namespace FlowDesk.Services
                     int id,
                     int? managerUserId)
         {
-            ServiceResult<string> departmentResult =
-                await GetManagerDepartmentAsync(managerUserId);
+            ServiceResult<ManagerAccessScope> departmentResult =
+                await GetManagerAccessScopeAsync(managerUserId);
 
             if (!departmentResult.IsSuccess)
             {
@@ -72,9 +73,10 @@ namespace FlowDesk.Services
 
             WorkItem? workItem =
                 await _workItemRepository
-                    .GetByIdInDepartmentAsNoTrackingAsync(
+                    .GetManagerWorkItemByIdAsNoTrackingAsync(
                         id,
-                        departmentResult.Data!);
+                        departmentResult.Data!.Department,
+                        departmentResult.Data.CanAccessAllDepartments);
 
             if (workItem == null)
             {
@@ -82,20 +84,21 @@ namespace FlowDesk.Services
                     .NotFound("Talep bulunamadı.");
             }
 
-            if (workItem.WorkflowStatus != WorkflowStatus.Approved)
+            if (!WorkflowStatusPolicy.CanDepartmentManagerExport(
+                    workItem.WorkflowStatus))
             {
                 return ServiceResult<ManagerReviewViewModel>
                     .Failure("Yalnızca onaylanmış talepler Excel olarak indirilebilir.");
             }
 
             return ServiceResult<ManagerReviewViewModel>
-                .Success(MapToReviewViewModel(workItem));
+                .Success(await MapToReviewViewModelAsync(workItem));
         }
         public async Task<ServiceResult<ManagerReviewViewModel>>
             GetReviewAsync(int id, int? managerUserId)
         {
-            ServiceResult<string> departmentResult =
-                await GetManagerDepartmentAsync(managerUserId);
+            ServiceResult<ManagerAccessScope> departmentResult =
+                await GetManagerAccessScopeAsync(managerUserId);
 
             if (!departmentResult.IsSuccess)
             {
@@ -111,9 +114,10 @@ namespace FlowDesk.Services
 
             WorkItem? workItem =
                 await _workItemRepository
-                    .GetByIdInDepartmentAsNoTrackingAsync(
+                    .GetManagerWorkItemByIdAsNoTrackingAsync(
                         id,
-                        departmentResult.Data!);
+                        departmentResult.Data!.Department,
+                        departmentResult.Data.CanAccessAllDepartments);
 
             if (workItem == null)
             {
@@ -121,8 +125,8 @@ namespace FlowDesk.Services
                     .NotFound("Talep bulunamadı.");
             }
 
-            if (workItem.WorkflowStatus !=
-                WorkflowStatus.WaitingManagerApproval)
+            if (!WorkflowStatusPolicy.CanDepartmentManagerReview(
+                    workItem.WorkflowStatus))
             {
                 return ServiceResult<ManagerReviewViewModel>
                     .Failure(
@@ -131,7 +135,7 @@ namespace FlowDesk.Services
             }
 
             ManagerReviewViewModel viewModel =
-                MapToReviewViewModel(workItem);
+                await MapToReviewViewModelAsync(workItem);
 
             return ServiceResult<ManagerReviewViewModel>
                 .Success(viewModel);
@@ -142,8 +146,8 @@ namespace FlowDesk.Services
                 ApproveRequestDto dto,
                 int? managerUserId)
         {
-            ServiceResult<string> departmentResult =
-                await GetManagerDepartmentAsync(managerUserId);
+            ServiceResult<ManagerAccessScope> departmentResult =
+                await GetManagerAccessScopeAsync(managerUserId);
 
             if (!departmentResult.IsSuccess)
             {
@@ -160,9 +164,10 @@ namespace FlowDesk.Services
 
             WorkItem? workItem =
                 await _workItemRepository
-                    .GetByIdInDepartmentAsync(
+                    .GetManagerWorkItemByIdAsync(
                         dto.WorkItemId,
-                        departmentResult.Data!);
+                        departmentResult.Data!.Department,
+                        departmentResult.Data.CanAccessAllDepartments);
 
             if (workItem == null)
             {
@@ -171,8 +176,8 @@ namespace FlowDesk.Services
                 );
             }
 
-            if (workItem.WorkflowStatus !=
-                WorkflowStatus.WaitingManagerApproval)
+            if (!WorkflowStatusPolicy.CanDepartmentManagerApprove(
+                    workItem.WorkflowStatus))
             {
                 return ServiceResult.Failure(
                     "Yalnızca yönetici onayı bekleyen " +
@@ -197,7 +202,8 @@ namespace FlowDesk.Services
             workItem.ManagerNote = managerNote;
             workItem.WorkflowStatus = WorkflowStatus.Approved;
             workItem.CurrentStatus =
-                "Departman Yöneticisi Tarafından Onaylandı";
+                WorkflowStatusDescriptions.GetDescription(
+                    WorkflowStatus.Approved);
             workItem.ApprovedAt = now;
             workItem.UpdatedAt = now;
 
@@ -211,8 +217,8 @@ namespace FlowDesk.Services
                 ReturnToAnalystDto dto,
                 int? managerUserId)
         {
-            ServiceResult<string> departmentResult =
-                await GetManagerDepartmentAsync(managerUserId);
+            ServiceResult<ManagerAccessScope> departmentResult =
+                await GetManagerAccessScopeAsync(managerUserId);
 
             if (!departmentResult.IsSuccess)
             {
@@ -248,9 +254,10 @@ namespace FlowDesk.Services
 
             WorkItem? workItem =
                 await _workItemRepository
-                    .GetByIdInDepartmentAsync(
+                    .GetManagerWorkItemByIdAsync(
                         dto.WorkItemId,
-                        departmentResult.Data!);
+                        departmentResult.Data!.Department,
+                        departmentResult.Data.CanAccessAllDepartments);
 
             if (workItem == null)
             {
@@ -259,8 +266,8 @@ namespace FlowDesk.Services
                 );
             }
 
-            if (workItem.WorkflowStatus !=
-                WorkflowStatus.WaitingManagerApproval)
+            if (!WorkflowStatusPolicy.CanDepartmentManagerReturnToAnalyst(
+                    workItem.WorkflowStatus))
             {
                 return ServiceResult.Failure(
                     "Yalnızca yönetici onayı bekleyen " +
@@ -272,7 +279,8 @@ namespace FlowDesk.Services
             workItem.WorkflowStatus =
                 WorkflowStatus.ReturnedToAnalyst;
             workItem.CurrentStatus =
-                "Departman Yöneticisi Tarafından Analiste İade Edildi";
+                WorkflowStatusDescriptions.GetDescription(
+                    WorkflowStatus.ReturnedToAnalyst);
             workItem.ApprovedAt = null;
             workItem.UpdatedAt = DateTime.UtcNow;
 
@@ -285,8 +293,8 @@ namespace FlowDesk.Services
             ServiceResult<List<ManagerInboxItemViewModel>>>
             GetApprovedRequestsAsync(int? managerUserId)
         {
-            ServiceResult<string> departmentResult =
-                await GetManagerDepartmentAsync(managerUserId);
+            ServiceResult<ManagerAccessScope> departmentResult =
+                await GetManagerAccessScopeAsync(managerUserId);
 
             if (!departmentResult.IsSuccess)
             {
@@ -298,7 +306,8 @@ namespace FlowDesk.Services
             List<WorkItem> workItems =
                 await _workItemRepository
                     .GetApprovedRequestsAsync(
-                        departmentResult.Data!);
+                        departmentResult.Data!.Department,
+                        departmentResult.Data.CanAccessAllDepartments);
 
             List<ManagerInboxItemViewModel> viewModels =
                 workItems
@@ -310,12 +319,12 @@ namespace FlowDesk.Services
                 .Success(viewModels);
         }
 
-        private async Task<ServiceResult<string>>
-            GetManagerDepartmentAsync(int? managerUserId)
+        private async Task<ServiceResult<ManagerAccessScope>>
+            GetManagerAccessScopeAsync(int? managerUserId)
         {
             if (!managerUserId.HasValue || managerUserId.Value <= 0)
             {
-                return ServiceResult<string>.Forbidden(
+                return ServiceResult<ManagerAccessScope>.Forbidden(
                     "Gecerli departman yoneticisi kimligi bulunamadi.");
             }
 
@@ -323,16 +332,28 @@ namespace FlowDesk.Services
                 managerUserId.Value.ToString());
 
             if (manager == null ||
-                !DepartmentOptions.Contains(manager.Department) ||
+                (!DepartmentOptions.Contains(manager.Department) &&
+                 !string.Equals(
+                     manager.Department,
+                     DepartmentOptions.AllDepartments,
+                     StringComparison.Ordinal)) ||
                 !await _userManager.IsInRoleAsync(
                     manager,
                     AppRoles.DepartmentManager))
             {
-                return ServiceResult<string>.Forbidden(
+                return ServiceResult<ManagerAccessScope>.Forbidden(
                     "Departman yoneticisi departmani gecersiz.");
             }
 
-            return ServiceResult<string>.Success(manager.Department!);
+            bool canAccessAllDepartments = string.Equals(
+                manager.Department,
+                DepartmentOptions.AllDepartments,
+                StringComparison.Ordinal);
+
+            return ServiceResult<ManagerAccessScope>.Success(
+                new ManagerAccessScope(
+                    manager.Department!,
+                    canAccessAllDepartments));
         }
 
         private static ManagerInboxItemViewModel
@@ -353,9 +374,14 @@ namespace FlowDesk.Services
             };
         }
 
-        private static ManagerReviewViewModel
-            MapToReviewViewModel(WorkItem workItem)
+        private async Task<ManagerReviewViewModel>
+            MapToReviewViewModelAsync(WorkItem workItem)
         {
+            string analystDisplayName =
+                await GetUserDisplayNameAsync(workItem.AnalystId);
+            string developerDisplayName =
+                await GetUserDisplayNameAsync(workItem.DeveloperId);
+
             return new ManagerReviewViewModel
             {
                 Id = workItem.Id,
@@ -367,7 +393,9 @@ namespace FlowDesk.Services
                 WorkflowStatus = workItem.WorkflowStatus,
                 CreatedAt = workItem.CreatedAt,
                 AnalystId = workItem.AnalystId,
+                AnalystDisplayName = analystDisplayName,
                 DeveloperId = workItem.DeveloperId,
+                DeveloperDisplayName = developerDisplayName,
                 ReleaseDate = workItem.ReleaseDate,
                 BanksoftDeliveryDate =
                     workItem.BanksoftDeliveryDate,
@@ -376,6 +404,26 @@ namespace FlowDesk.Services
                 AnalystNote = workItem.AnalystNote,
                 ManagerNote = workItem.ManagerNote
             };
+        }
+
+        private async Task<string> GetUserDisplayNameAsync(int? userId)
+        {
+            if (!userId.HasValue)
+            {
+                return string.Empty;
+            }
+
+            ApplicationUser? user = await _userManager.FindByIdAsync(
+                userId.Value.ToString());
+
+            if (user == null)
+            {
+                return string.Empty;
+            }
+
+            return string.IsNullOrWhiteSpace(user.BusinessCode)
+                ? user.FullName
+                : $"{user.FullName} \u2014 {user.BusinessCode}";
         }
 
         private static string? NormalizeNullableText(

@@ -20,7 +20,11 @@ namespace FlowDesk.ViewModels.DepartmentManager
 
         public int? AnalystId { get; set; }
 
+        public string AnalystDisplayName { get; set; } = string.Empty;
+
         public int? DeveloperId { get; set; }
+
+        public string DeveloperDisplayName { get; set; } = string.Empty;
 
         public DateTime? ReleaseDate { get; set; }
 

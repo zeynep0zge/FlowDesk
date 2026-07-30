@@ -110,7 +110,8 @@ namespace FlowDesk.Services
                     "Bu talebe erisim yetkiniz bulunmuyor.");
             }
 
-            if (!CanAnalystEdit(workItem.WorkflowStatus))
+            if (!WorkflowStatusPolicy.CanAnalystSaveAnalysis(
+                    workItem.WorkflowStatus))
             {
                 return ServiceResult<AnalystReviewViewModel>
                     .Failure(
@@ -120,7 +121,7 @@ namespace FlowDesk.Services
             }
 
             AnalystReviewViewModel viewModel =
-                MapToReviewViewModel(workItem);
+                await MapToReviewViewModelAsync(workItem);
 
             return ServiceResult<AnalystReviewViewModel>
                 .Success(viewModel);
@@ -170,7 +171,8 @@ namespace FlowDesk.Services
                     "Bu talep baska bir analist tarafindan sahiplenilmis.");
             }
 
-            if (!CanAnalystEdit(workItem.WorkflowStatus))
+            if (!WorkflowStatusPolicy.CanAnalystStartReview(
+                    workItem.WorkflowStatus))
             {
                 return ServiceResult.Failure(
                     "Bu talep analist tarafından " +
@@ -187,7 +189,8 @@ namespace FlowDesk.Services
                     WorkflowStatus.UnderAnalystReview;
 
                 workItem.CurrentStatus =
-                    "Analist İncelemesinde";
+                    WorkflowStatusDescriptions.GetDescription(
+                        WorkflowStatus.UnderAnalystReview);
 
                 workItem.UpdatedAt = DateTime.UtcNow;
 
@@ -231,7 +234,8 @@ namespace FlowDesk.Services
                     "Bu talebi degistirme yetkiniz bulunmuyor.");
             }
 
-            if (!CanAnalystEdit(workItem.WorkflowStatus))
+            if (!WorkflowStatusPolicy.CanAnalystSaveAnalysis(
+                    workItem.WorkflowStatus))
             {
                 return ServiceResult<AnalystReviewViewModel>
                     .Failure(
@@ -250,6 +254,24 @@ namespace FlowDesk.Services
                 NormalizeNullableText(dto.AnalystNote);
 
             List<string> validationErrors = new();
+
+            if (currentStatus != null &&
+                currentStatus.Length >
+                    AnalystCurrentStatusOptions.MaximumLength)
+            {
+                validationErrors.Add(
+                    "Mevcut statü en fazla " +
+                    $"{AnalystCurrentStatusOptions.MaximumLength} " +
+                    "karakter olabilir."
+                );
+            }
+            else if (currentStatus != null &&
+                     !AnalystCurrentStatusOptions.Contains(currentStatus))
+            {
+                validationErrors.Add(
+                    "Geçerli bir mevcut statü seçiniz."
+                );
+            }
 
             if (dto.AnalystId.HasValue &&
                 dto.AnalystId.Value <= 0)
@@ -318,7 +340,8 @@ namespace FlowDesk.Services
             workItem.AnalystNote = analystNote;
 
             workItem.CurrentStatus =
-                currentStatus ?? "Analist İncelemesinde";
+                currentStatus ?? WorkflowStatusDescriptions.GetDescription(
+                    WorkflowStatus.UnderAnalystReview);
 
             workItem.WorkflowStatus =
                 WorkflowStatus.UnderAnalystReview;
@@ -328,7 +351,7 @@ namespace FlowDesk.Services
             await _workItemRepository.SaveChangesAsync();
 
             AnalystReviewViewModel viewModel =
-                MapToReviewViewModel(workItem);
+                await MapToReviewViewModelAsync(workItem);
 
             return ServiceResult<AnalystReviewViewModel>
                 .Success(viewModel);
@@ -381,7 +404,8 @@ namespace FlowDesk.Services
                 );
             }
 
-            if (!CanAnalystEdit(workItem.WorkflowStatus))
+            if (!WorkflowStatusPolicy.CanAnalystSubmitForManagerApproval(
+                    workItem.WorkflowStatus))
             {
                 return ServiceResult.Failure(
                     "Bu talep yönetici onayına " +
@@ -502,7 +526,8 @@ namespace FlowDesk.Services
                 WorkflowStatus.WaitingManagerApproval;
 
             workItem.CurrentStatus =
-                "Departman Yöneticisi Onayı Bekliyor";
+                WorkflowStatusDescriptions.GetDescription(
+                    WorkflowStatus.WaitingManagerApproval);
 
             workItem.UpdatedAt = DateTime.UtcNow;
 
@@ -526,6 +551,7 @@ namespace FlowDesk.Services
             if (developer == null ||
                 !developer.EmailConfirmed ||
                 !developer.IsApproved ||
+                string.IsNullOrWhiteSpace(developer.BusinessCode) ||
                 !await _userManager.IsInRoleAsync(
                     developer,
                     AppRoles.Employee) ||
@@ -546,16 +572,6 @@ namespace FlowDesk.Services
             return userId.HasValue && userId.Value > 0;
         }
 
-        private static bool CanAnalystEdit(
-            WorkflowStatus workflowStatus)
-        {
-            return workflowStatus ==
-                       WorkflowStatus.Submitted ||
-                   workflowStatus ==
-                       WorkflowStatus.UnderAnalystReview ||
-                   workflowStatus ==
-                       WorkflowStatus.ReturnedToAnalyst;
-        }
 
         private static string? NormalizeNullableText(
             string? value)
@@ -601,9 +617,35 @@ namespace FlowDesk.Services
             };
         }
 
-        private static AnalystReviewViewModel
-            MapToReviewViewModel(WorkItem workItem)
+        private async Task<AnalystReviewViewModel>
+            MapToReviewViewModelAsync(WorkItem workItem)
         {
+            ApplicationUser? analyst = workItem.AnalystId.HasValue
+                ? await _userManager.FindByIdAsync(
+                    workItem.AnalystId.Value.ToString())
+                : null;
+
+            IList<ApplicationUser> employees =
+                await _userManager.GetUsersInRoleAsync(AppRoles.Employee);
+
+            List<UserSelectionOptionViewModel> developerOptions = employees
+                .Where(user =>
+                    user.EmailConfirmed &&
+                    user.IsApproved &&
+                    !string.IsNullOrWhiteSpace(user.BusinessCode) &&
+                    string.Equals(
+                        user.Department,
+                        workItem.Department,
+                        StringComparison.Ordinal))
+                .OrderBy(user => user.FullName)
+                .ThenBy(user => user.BusinessCode)
+                .Select(user => new UserSelectionOptionViewModel
+                {
+                    Id = user.Id,
+                    DisplayText = $"{user.FullName} \u2014 {user.BusinessCode}"
+                })
+                .ToList();
+
             return new AnalystReviewViewModel
             {
                 Id = workItem.Id,
@@ -629,8 +671,16 @@ namespace FlowDesk.Services
                 AnalystId =
                     workItem.AnalystId,
 
+                AnalystDisplayName = analyst == null
+                    ? string.Empty
+                    : string.IsNullOrWhiteSpace(analyst.BusinessCode)
+                        ? analyst.FullName
+                        : $"{analyst.FullName} \u2014 {analyst.BusinessCode}",
+
                 DeveloperId =
                     workItem.DeveloperId,
+
+                DeveloperOptions = developerOptions,
 
                 ReleaseDate =
                     workItem.ReleaseDate,

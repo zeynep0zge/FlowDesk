@@ -15,6 +15,9 @@ namespace FlowDesk.Models
         [StringLength(50)]
         public string? RequestedRole { get; set; }
 
+        [StringLength(18)]
+        public string? BusinessCode { get; set; }
+
         public bool IsApproved { get; set; } = true;
 
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;

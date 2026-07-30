@@ -1,4 +1,5 @@
 @using FlowDesk.Constants
+@using FlowDesk.Common
 @using Microsoft.AspNetCore.Identity
 @inject UserManager<ApplicationUser> UserManager
 
@@ -20,6 +21,12 @@
         User.IsInRole(AppRoles.DepartmentManager) ? "Departman Yöneticisi" :
         User.IsInRole(AppRoles.Employee) ? "Yazılımcı" :
         string.Empty;
+
+    if (User.IsInRole(AppRoles.DepartmentManager) &&
+        !string.IsNullOrWhiteSpace(currentUser?.Department))
+    {
+        roleDisplayName += $" \u00b7 {currentUser.Department}";
+    }
 
     string dashboardController =
         User.IsInRole(AppRoles.ProjectManager) ? "ProjectManager" :
@@ -135,6 +142,10 @@
                             <div class="d-flex flex-column text-start">
                                 <span class="user-name">@displayName</span>
                                 <span class="user-role">@roleDisplayName</span>
+                                @if (!string.IsNullOrWhiteSpace(currentUser?.BusinessCode))
+                                {
+                                    <span class="user-code">@currentUser.BusinessCode</span>
+                                }
                             </div>
                         </div>
 

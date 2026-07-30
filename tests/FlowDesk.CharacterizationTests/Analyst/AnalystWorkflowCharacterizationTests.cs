@@ -1,4 +1,6 @@
 using FlowDesk.CharacterizationTests.Infrastructure;
+using FlowDesk.Common;
+using FlowDesk.Constants;
 using FlowDesk.DTOs.Analyst;
 using FlowDesk.Models;
 using FlowDesk.Repositories.Interfaces;
@@ -9,6 +11,110 @@ namespace FlowDesk.CharacterizationTests.Analyst;
 public sealed class AnalystWorkflowCharacterizationTests
     : DatabaseTestBase
 {
+    [Fact]
+    public async Task GetReview_DeveloperOptions_ContainOnlyEligibleDepartmentEmployees()
+    {
+        await WithServicesAsync(async services =>
+        {
+            string department = DepartmentOptions.All.First(
+                value => value != TestDataSeeder.DefaultDepartment);
+
+            ApplicationUser eligible = await TestDataSeeder.CreateUserAsync(
+                services,
+                TestDataSeeder.UniqueEmail("eligible-developer"),
+                assignedRole: AppRoles.Employee,
+                department: department,
+                businessCode: "ENG-29072026-1001",
+                fullName: "Eligible Developer");
+            ApplicationUser unapproved = await TestDataSeeder.CreateUserAsync(
+                services,
+                TestDataSeeder.UniqueEmail("unapproved-developer"),
+                isApproved: false,
+                assignedRole: AppRoles.Employee,
+                department: department,
+                businessCode: "ENG-29072026-1002");
+            ApplicationUser unconfirmed = await TestDataSeeder.CreateUserAsync(
+                services,
+                TestDataSeeder.UniqueEmail("unconfirmed-developer"),
+                emailConfirmed: false,
+                assignedRole: AppRoles.Employee,
+                department: department,
+                businessCode: "ENG-29072026-1003");
+            ApplicationUser wrongRole = await TestDataSeeder.CreateUserAsync(
+                services,
+                TestDataSeeder.UniqueEmail("wrong-role-developer"),
+                assignedRole: AppRoles.Analyst,
+                department: department,
+                businessCode: "ANL-29072026-1004");
+            ApplicationUser missingCode = await TestDataSeeder.CreateUserAsync(
+                services,
+                TestDataSeeder.UniqueEmail("missing-code-developer"),
+                assignedRole: AppRoles.Employee,
+                department: department);
+            ApplicationUser otherDepartment =
+                await TestDataSeeder.CreateUserAsync(
+                    services,
+                    TestDataSeeder.UniqueEmail("other-department-developer"),
+                    assignedRole: AppRoles.Employee,
+                    department: TestDataSeeder.DefaultDepartment,
+                    businessCode: "ENG-29072026-1005");
+
+            WorkItem workItem = await TestDataSeeder.CreateWorkItemAsync(
+                services,
+                WorkflowStatus.UnderAnalystReview,
+                department: department,
+                analystId: 11);
+
+            var result = await services
+                .GetRequiredService<IAnalystWorkflowService>()
+                .GetReviewAsync(workItem.Id, 11);
+
+            Assert.True(result.IsSuccess);
+            Assert.Contains(
+                result.Data!.DeveloperOptions,
+                option => option.Id == eligible.Id &&
+                          option.DisplayText.Contains(
+                              eligible.BusinessCode!,
+                              StringComparison.Ordinal));
+            Assert.DoesNotContain(result.Data.DeveloperOptions, option =>
+                option.Id == unapproved.Id ||
+                option.Id == unconfirmed.Id ||
+                option.Id == wrongRole.Id ||
+                option.Id == missingCode.Id ||
+                option.Id == otherDepartment.Id);
+        });
+    }
+
+    [Fact]
+    public async Task SaveAnalysis_EmployeeWithoutBusinessCode_IsRejectedServerSide()
+    {
+        await WithServicesAsync(async services =>
+        {
+            ApplicationUser employee = await TestDataSeeder.CreateUserAsync(
+                services,
+                TestDataSeeder.UniqueEmail("developer-without-code"),
+                assignedRole: AppRoles.Employee,
+                userId: 5500);
+            WorkItem workItem = await TestDataSeeder.CreateWorkItemAsync(
+                services,
+                WorkflowStatus.UnderAnalystReview,
+                analystId: 11);
+
+            var result = await services
+                .GetRequiredService<IAnalystWorkflowService>()
+                .SaveAnalysisAsync(
+                    new SaveAnalysisDto
+                    {
+                        WorkItemId = workItem.Id,
+                        DeveloperId = employee.Id
+                    },
+                    11);
+
+            Assert.False(result.IsSuccess);
+            Assert.Null(workItem.DeveloperId);
+        });
+    }
+
     [Fact]
     public async Task StartReview_SubmittedRequest_TransitionsToUnderAnalystReview()
     {
@@ -179,6 +285,82 @@ public sealed class AnalystWorkflowCharacterizationTests
         });
     }
 
+    [Theory]
+    [InlineData(AnalystCurrentStatusOptions.UnderAnalystReview)]
+    [InlineData(AnalystCurrentStatusOptions.WaitingForDevelopment)]
+    [InlineData(AnalystCurrentStatusOptions.DevelopmentInProgress)]
+    [InlineData(AnalystCurrentStatusOptions.WaitingForTest)]
+    [InlineData(AnalystCurrentStatusOptions.ReadyForRelease)]
+    public async Task SaveAnalysis_AllowedCurrentStatus_IsAccepted(
+        string currentStatus)
+    {
+        await WithServicesAsync(async services =>
+        {
+            WorkItem workItem = await TestDataSeeder.CreateWorkItemAsync(
+                services,
+                WorkflowStatus.UnderAnalystReview,
+                analystId: 11);
+            IAnalystWorkflowService service =
+                services.GetRequiredService<IAnalystWorkflowService>();
+
+            var result = await service.SaveAnalysisAsync(
+                new SaveAnalysisDto
+                {
+                    WorkItemId = workItem.Id,
+                    AnalystId = 11,
+                    CurrentStatus = currentStatus
+                },
+                11);
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal(currentStatus, workItem.CurrentStatus);
+        });
+    }
+
+    [Fact]
+    public async Task SaveAnalysis_FakeCurrentStatus_ReturnsControlledFailure()
+    {
+        await AssertInvalidCurrentStatusAsync(
+            "Sahte Statü",
+            "Geçerli bir mevcut statü seçiniz.");
+    }
+
+    [Fact]
+    public async Task SaveAnalysis_TooLongCurrentStatus_ReturnsControlledFailure()
+    {
+        await AssertInvalidCurrentStatusAsync(
+            new string('x', AnalystCurrentStatusOptions.MaximumLength + 1),
+            "Mevcut statü en fazla 100 karakter olabilir.");
+    }
+
+    private async Task AssertInvalidCurrentStatusAsync(
+        string currentStatus,
+        string expectedError)
+    {
+        await WithServicesAsync(async services =>
+        {
+            WorkItem workItem = await TestDataSeeder.CreateWorkItemAsync(
+                services,
+                WorkflowStatus.UnderAnalystReview,
+                analystId: 11);
+            string originalCurrentStatus = workItem.CurrentStatus;
+            IAnalystWorkflowService service =
+                services.GetRequiredService<IAnalystWorkflowService>();
+
+            var result = await service.SaveAnalysisAsync(
+                new SaveAnalysisDto
+                {
+                    WorkItemId = workItem.Id,
+                    AnalystId = 11,
+                    CurrentStatus = currentStatus
+                },
+                11);
+
+            Assert.False(result.IsSuccess);
+            Assert.Equal(expectedError, result.ErrorMessage);
+            Assert.Equal(originalCurrentStatus, workItem.CurrentStatus);
+        });
+    }
     private async Task AssertInvalidSaveDoesNotPersistAsync(
         Action<SaveAnalysisDto> makeInvalid)
     {

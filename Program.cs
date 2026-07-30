@@ -65,6 +65,8 @@ builder.Services.ConfigureApplicationCookie(options =>
 
 builder.Services.AddScoped<IWorkItemRepository, WorkItemRepository>();
 
+builder.Services.AddScoped<IIdentifierGenerator, IdentifierGenerator>();
+
 builder.Services.AddScoped<
     IProjectManagerWorkItemService,
     ProjectManagerWorkItemService>();
@@ -107,6 +109,9 @@ using (var scope = app.Services.CreateScope())
         await IdentitySeeder.SeedTestUsersAsync(
             scope.ServiceProvider);
     }
+
+    await IdentitySeeder.BackfillBusinessCodesAsync(
+        scope.ServiceProvider);
 
 }
 

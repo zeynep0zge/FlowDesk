@@ -51,7 +51,6 @@ namespace FlowDesk.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(
             [Bind(
-                "RequestNumber," +
                 "RequestDescription," +
                 "Department," +
                 "Priority"
@@ -66,17 +65,7 @@ namespace FlowDesk.Controllers
                 return Forbid();
             }
 
-            ServiceResult<string> validationResult =
-                await _workItemService.ValidateCreateAsync(
-                    workItem.RequestNumber);
-
-            if (!validationResult.IsSuccess)
-            {
-                ModelState.AddModelError(
-                    nameof(workItem.RequestNumber),
-                    validationResult.ErrorMessage!
-                );
-            }
+            ModelState.Remove(nameof(WorkItem.RequestNumber));
 
             ValidateDepartment(workItem);
 
@@ -88,7 +77,6 @@ namespace FlowDesk.Controllers
             ServiceResult createResult =
                 await _workItemService.CreateAsync(
                     workItem,
-                    validationResult.Data!,
                     currentUserId);
 
             if (!createResult.IsSuccess)
@@ -145,7 +133,7 @@ namespace FlowDesk.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(
             int id,
-            [Bind("Id,RequestNumber,RequestDescription,Department,Priority")]
+            [Bind("Id,RequestDescription,Department,Priority")]
             WorkItem workItem
         )
         {
@@ -164,18 +152,8 @@ namespace FlowDesk.Controllers
                 return HandleWorkItemFailure(accessResult);
             }
 
-            ServiceResult<string> validationResult =
-                await _workItemService.ValidateUpdateAsync(
-                    id,
-                    workItem.RequestNumber);
-
-            if (!validationResult.IsSuccess)
-            {
-                ModelState.AddModelError(
-                    nameof(workItem.RequestNumber),
-                    validationResult.ErrorMessage!
-                );
-            }
+            workItem.RequestNumber = accessResult.Data!.RequestNumber;
+            ModelState.Remove(nameof(WorkItem.RequestNumber));
 
             ValidateDepartment(workItem);
 
@@ -188,7 +166,6 @@ namespace FlowDesk.Controllers
                 await _workItemService.UpdateAsync(
                     id,
                     workItem,
-                    validationResult.Data!,
                     GetCurrentUserId());
 
             if (!updateResult.IsSuccess)

@@ -2,6 +2,8 @@ namespace FlowDesk.Common
 {
     public static class DepartmentOptions
     {
+        public const string AllDepartments = "T\u00fcm Departmanlar";
+
         public static readonly IReadOnlyList<string> All =
         [
             "Çağrı Merkezi Uygulamaları",

@@ -17,9 +17,9 @@
             <input asp-for="Id" type="hidden" />
             <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
             <div class="mb-3">
-                <label asp-for="RequestNumber" class="form-label"></label>
-                <input asp-for="RequestNumber" class="form-control" maxlength="50" aria-required="true" />
-                <span asp-validation-for="RequestNumber" class="text-danger"></span>
+                <div class="form-label">Talep No</div>
+                <div class="form-control bg-light" aria-readonly="true">@Model.RequestNumber</div>
+                <div class="form-text">Talep numaras&#305; sistem taraf&#305;ndan atan&#305;r ve de&#287;i&#351;tirilemez.</div>
             </div>
             <div class="mb-3">
                 <label asp-for="RequestDescription" class="form-label"></label>

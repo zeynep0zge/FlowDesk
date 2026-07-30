@@ -35,6 +35,7 @@ public sealed class AccountApprovalCharacterizationTests
             return new
             {
                 user.IsApproved,
+                user.BusinessCode,
                 isInRole = await userManager.IsInRoleAsync(
                     user,
                     AppRoles.Analyst)
@@ -43,6 +44,51 @@ public sealed class AccountApprovalCharacterizationTests
 
         Assert.True(state.IsApproved);
         Assert.True(state.isInRole);
+        Assert.Matches(@"^ANL-\d{8}-\d{4}$", state.BusinessCode!);
+    }
+
+    [Theory]
+    [InlineData(AppRoles.Employee, "ENG")]
+    [InlineData(AppRoles.ProjectManager, "ISB")]
+    public async Task ApproveUser_AssignsRoleSpecificBusinessCode(
+        string requestedRole,
+        string expectedPrefix)
+    {
+        ApplicationUser pendingUser = await SeedPendingUserAsync(
+            TestDataSeeder.UniqueEmail("approval-business-code"),
+            requestedRole);
+
+        await ApproveAsync(ManagerClient(), pendingUser.Id);
+
+        string? businessCode = await WithServicesAsync(async services =>
+            (await services.GetRequiredService<UserManager<ApplicationUser>>()
+                .FindByIdAsync(pendingUser.Id.ToString()))!.BusinessCode);
+
+        Assert.Matches(
+            $@"^{expectedPrefix}-\d{{8}}-\d{{4}}$",
+            businessCode!);
+    }
+
+    [Fact]
+    public async Task ApproveUser_ExistingBusinessCode_DoesNotReplaceIt()
+    {
+        const string existingCode = "ANL-29072026-4321";
+        ApplicationUser pendingUser = await WithServicesAsync(services =>
+            TestDataSeeder.CreateUserAsync(
+                services,
+                TestDataSeeder.UniqueEmail("approval-existing-code"),
+                emailConfirmed: true,
+                isApproved: false,
+                requestedRole: AppRoles.Analyst,
+                businessCode: existingCode));
+
+        await ApproveAsync(ManagerClient(), pendingUser.Id);
+
+        string? businessCode = await WithServicesAsync(async services =>
+            (await services.GetRequiredService<UserManager<ApplicationUser>>()
+                .FindByIdAsync(pendingUser.Id.ToString()))!.BusinessCode);
+
+        Assert.Equal(existingCode, businessCode);
     }
 
     [Fact]

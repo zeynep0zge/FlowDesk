@@ -12,19 +12,22 @@ namespace FlowDesk.Services
         : IAccountApprovalService
     {
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IIdentifierGenerator _identifierGenerator;
 
         public AccountApprovalService(
-            UserManager<ApplicationUser> userManager)
+            UserManager<ApplicationUser> userManager,
+            IIdentifierGenerator identifierGenerator)
         {
             _userManager = userManager;
+            _identifierGenerator = identifierGenerator;
         }
 
         public async Task<
             ServiceResult<IReadOnlyList<PendingUserViewModel>>>
             GetPendingUsersAsync(int? managerUserId)
         {
-            ServiceResult<string> departmentResult =
-                await GetManagerDepartmentAsync(managerUserId);
+            ServiceResult<ManagerAccessScope> departmentResult =
+                await GetManagerAccessScopeAsync(managerUserId);
 
             if (!departmentResult.IsSuccess)
             {
@@ -33,7 +36,7 @@ namespace FlowDesk.Services
                         departmentResult.ErrorMessage!);
             }
 
-            string department = departmentResult.Data!;
+            ManagerAccessScope managerScope = departmentResult.Data!;
 
             List<PendingUserViewModel> pendingUsers =
                 await _userManager.Users
@@ -41,7 +44,8 @@ namespace FlowDesk.Services
                 .Where(user =>
                     user.EmailConfirmed &&
                     !user.IsApproved &&
-                    user.Department == department &&
+                    (managerScope.CanAccessAllDepartments ||
+                     user.Department == managerScope.Department) &&
                     user.RequestedRole != null &&
                     user.RequestedRole != string.Empty)
                 .OrderBy(user => user.CreatedAtUtc)
@@ -65,8 +69,8 @@ namespace FlowDesk.Services
             int userId,
             int? managerUserId)
         {
-            ServiceResult<string> departmentResult =
-                await GetManagerDepartmentAsync(managerUserId);
+            ServiceResult<ManagerAccessScope> departmentResult =
+                await GetManagerAccessScopeAsync(managerUserId);
 
             if (!departmentResult.IsSuccess)
             {
@@ -83,9 +87,10 @@ namespace FlowDesk.Services
                     "Kullanıcı bulunamadı.");
             }
 
-            if (!string.Equals(
+            if (!departmentResult.Data!.CanAccessAllDepartments &&
+                !string.Equals(
                     user.Department,
-                    departmentResult.Data,
+                    departmentResult.Data.Department,
                     StringComparison.Ordinal))
             {
                 return ServiceResult.Forbidden(
@@ -139,6 +144,23 @@ namespace FlowDesk.Services
                 }
             }
 
+            if (string.IsNullOrWhiteSpace(user.BusinessCode))
+            {
+                try
+                {
+                    user.BusinessCode =
+                        await _identifierGenerator.GenerateUserCodeAsync(
+                            user.RequestedRole!);
+                }
+                catch (Exception exception)
+                    when (exception is ArgumentException or
+                          InvalidOperationException)
+                {
+                    return ServiceResult.Failure(
+                        "Kullanici kurumsal kodu olusturulamadi.");
+                }
+            }
+
             user.IsApproved = true;
             IdentityResult updateResult =
                 await _userManager.UpdateAsync(user);
@@ -154,12 +176,12 @@ namespace FlowDesk.Services
                 "talep edilen rol atandı.");
         }
 
-        private async Task<ServiceResult<string>>
-            GetManagerDepartmentAsync(int? managerUserId)
+        private async Task<ServiceResult<ManagerAccessScope>>
+            GetManagerAccessScopeAsync(int? managerUserId)
         {
             if (!managerUserId.HasValue || managerUserId.Value <= 0)
             {
-                return ServiceResult<string>.Forbidden(
+                return ServiceResult<ManagerAccessScope>.Forbidden(
                     "Gecerli departman yoneticisi kimligi bulunamadi.");
             }
 
@@ -167,16 +189,28 @@ namespace FlowDesk.Services
                 managerUserId.Value.ToString());
 
             if (manager == null ||
-                !DepartmentOptions.Contains(manager.Department) ||
+                (!DepartmentOptions.Contains(manager.Department) &&
+                 !string.Equals(
+                     manager.Department,
+                     DepartmentOptions.AllDepartments,
+                     StringComparison.Ordinal)) ||
                 !await _userManager.IsInRoleAsync(
                     manager,
                     AppRoles.DepartmentManager))
             {
-                return ServiceResult<string>.Forbidden(
+                return ServiceResult<ManagerAccessScope>.Forbidden(
                     "Departman yoneticisi departmani gecersiz.");
             }
 
-            return ServiceResult<string>.Success(manager.Department!);
+            bool canAccessAllDepartments = string.Equals(
+                manager.Department,
+                DepartmentOptions.AllDepartments,
+                StringComparison.Ordinal);
+
+            return ServiceResult<ManagerAccessScope>.Success(
+                new ManagerAccessScope(
+                    manager.Department!,
+                    canAccessAllDepartments));
         }
 
         private static string JoinIdentityErrors(

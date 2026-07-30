@@ -30,9 +30,13 @@ public sealed class ProjectManagerCharacterizationTests
         WorkItem? workItem = await WithServicesAsync(async services =>
             await services.GetRequiredService<AppDbContext>()
                 .WorkItems.AsNoTracking()
-                .SingleOrDefaultAsync(x => x.RequestNumber == requestNumber));
+                .SingleOrDefaultAsync());
 
         Assert.NotNull(workItem);
+        Assert.NotEqual(requestNumber, workItem.RequestNumber);
+        Assert.Matches(
+            @"^TLP-\d{8}-\d{4}$",
+            workItem.RequestNumber);
         Assert.Equal("Characterization request", workItem.RequestDescription);
         Assert.Equal(TestDataSeeder.DefaultDepartment, workItem.Department);
         Assert.Equal(RequestPriority.High, workItem.Priority);
@@ -57,7 +61,7 @@ public sealed class ProjectManagerCharacterizationTests
         int? createdByUserId = await WithServicesAsync(async services =>
             await services.GetRequiredService<AppDbContext>()
                 .WorkItems.AsNoTracking()
-                .Where(x => x.RequestNumber == requestNumber)
+                .Where(x => x.CreatedByUserId == userId)
                 .Select(x => x.CreatedByUserId)
                 .SingleAsync());
 
@@ -99,7 +103,8 @@ public sealed class ProjectManagerCharacterizationTests
                 .WorkItems.AsNoTracking()
                 .SingleAsync(x => x.Id == seeded.Id));
 
-        Assert.Equal(updatedNumber, updated.RequestNumber);
+        Assert.Equal(seeded.RequestNumber, updated.RequestNumber);
+        Assert.NotEqual(updatedNumber, updated.RequestNumber);
         Assert.Equal("Updated description", updated.RequestDescription);
         Assert.Equal(RequestPriority.Critical, updated.Priority);
         Assert.NotNull(updated.UpdatedAt);
