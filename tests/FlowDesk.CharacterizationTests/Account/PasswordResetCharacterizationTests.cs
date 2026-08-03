@@ -5,6 +5,7 @@ using FlowDesk.Data;
 using FlowDesk.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace FlowDesk.CharacterizationTests.Account;
 
@@ -143,6 +144,79 @@ public sealed class PasswordResetCharacterizationTests
                 .PasswordResetRequests.CountAsync());
 
         Assert.Equal(0, requestCount);
+    }
+
+    [Fact]
+    public async Task ResetPassword_CompletionSaveFailure_RollsBackPassword()
+    {
+        using var factory = new FlowDeskWebApplicationFactory(
+            "Testing",
+            new FailPasswordResetCompletionInterceptor());
+        await factory.ResetDatabaseAsync();
+        string email = TestDataSeeder.UniqueEmail("reset-rollback");
+
+        await using (AsyncServiceScope scope =
+                     factory.Services.CreateAsyncScope())
+        {
+            await TestDataSeeder.CreateUserAsync(
+                scope.ServiceProvider,
+                email,
+                emailConfirmed: true,
+                isApproved: true,
+                assignedRole: AppRoles.ProjectManager);
+        }
+
+        using HttpClient client = factory.CreateClient(
+            new WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false,
+                BaseAddress = new Uri("https://localhost")
+            });
+        client.Timeout = TimeSpan.FromSeconds(15);
+        await RequestResetAsync(client, email);
+        string code = factory.Email.GetLatestSixDigitCode(email);
+        HttpResponseMessage verify =
+            await client.PostFormWithAntiforgeryAsync(
+                $"/Account/VerifyResetCode?email={Uri.EscapeDataString(email)}",
+                "/Account/VerifyResetCode",
+                new Dictionary<string, string>
+                {
+                    ["Email"] = email,
+                    ["Code"] = code
+                });
+        string token = AccountTestHelper.GetQueryValue(
+            verify.Headers,
+            "token");
+        const string newPassword = "RollbackPass123!";
+
+        HttpResponseMessage response = await ResetPasswordAsync(
+            client,
+            email,
+            token,
+            newPassword);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        await using AsyncServiceScope verificationScope =
+            factory.Services.CreateAsyncScope();
+        UserManager<ApplicationUser> userManager = verificationScope
+            .ServiceProvider.GetRequiredService<
+                UserManager<ApplicationUser>>();
+        ApplicationUser user =
+            (await userManager.FindByEmailAsync(email))!;
+        PasswordResetRequest request = await verificationScope
+            .ServiceProvider.GetRequiredService<AppDbContext>()
+            .PasswordResetRequests.AsNoTracking()
+            .SingleAsync();
+
+        Assert.True(await userManager.CheckPasswordAsync(
+            user,
+            TestDataSeeder.DefaultPassword));
+        Assert.False(await userManager.CheckPasswordAsync(
+            user,
+            newPassword));
+        Assert.Null(request.CompletedAtUtc);
+        Assert.False(request.IsInvalidated);
     }
 
     private async Task SeedUserAsync(string email)

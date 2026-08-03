@@ -255,6 +255,13 @@ namespace FlowDesk.Services
 
             List<string> validationErrors = new();
 
+            string? expectedStatusError =
+                ValidateExpectedStatus(expectedStatus);
+            if (expectedStatusError != null)
+            {
+                validationErrors.Add(expectedStatusError);
+            }
+
             if (currentStatus != null &&
                 currentStatus.Length >
                     AnalystCurrentStatusOptions.MaximumLength)
@@ -422,6 +429,13 @@ namespace FlowDesk.Services
             List<string> missingFields = new();
             List<string> invalidFields = new();
 
+            string? expectedStatusError =
+                ValidateExpectedStatus(expectedStatus);
+            if (expectedStatusError != null)
+            {
+                return ServiceResult.Failure(expectedStatusError);
+            }
+
             if (!dto.AnalystId.HasValue)
             {
                 missingFields.Add("analist");
@@ -579,6 +593,14 @@ namespace FlowDesk.Services
             return string.IsNullOrWhiteSpace(value)
                 ? null
                 : value.Trim();
+        }
+
+        private static string? ValidateExpectedStatus(
+            string? expectedStatus)
+        {
+            return expectedStatus?.Length > 100
+                ? "Beklenen statü en fazla 100 karakter olabilir."
+                : null;
         }
 
         private static AnalystInboxItemViewModel

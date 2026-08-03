@@ -1,7 +1,10 @@
 using System.Net;
 using FlowDesk.CharacterizationTests.Infrastructure;
 using FlowDesk.Constants;
+using FlowDesk.Data;
 using FlowDesk.Models;
+using FlowDesk.Services;
+using FlowDesk.Services.Interfaces;
 using Microsoft.AspNetCore.Identity;
 
 namespace FlowDesk.CharacterizationTests.DepartmentManager;
@@ -175,6 +178,49 @@ public sealed class AccountApprovalCharacterizationTests
         Assert.True(isApproved);
     }
 
+    [Fact]
+    public async Task ApproveUser_CodeGenerationFailure_RollsBackRoleAndState()
+    {
+        ApplicationUser pendingUser = await SeedPendingUserAsync(
+            TestDataSeeder.UniqueEmail("approval-rollback"),
+            AppRoles.Analyst);
+
+        var result = await WithServicesAsync(async services =>
+        {
+            var service = new AccountApprovalService(
+                services.GetRequiredService<
+                    UserManager<ApplicationUser>>(),
+                new ThrowingIdentifierGenerator(),
+                services.GetRequiredService<AppDbContext>(),
+                services.GetRequiredService<
+                    IManagerAccessScopeResolver>());
+
+            return await service.ApproveUserAsync(pendingUser.Id, 9001);
+        });
+
+        Assert.False(result.IsSuccess);
+
+        var state = await WithServicesAsync(async services =>
+        {
+            UserManager<ApplicationUser> userManager =
+                services.GetRequiredService<UserManager<ApplicationUser>>();
+            ApplicationUser user = (await userManager.FindByIdAsync(
+                pendingUser.Id.ToString()))!;
+            return new
+            {
+                user.IsApproved,
+                user.BusinessCode,
+                IsInRole = await userManager.IsInRoleAsync(
+                    user,
+                    AppRoles.Analyst)
+            };
+        });
+
+        Assert.False(state.IsApproved);
+        Assert.Null(state.BusinessCode);
+        Assert.False(state.IsInRole);
+    }
+
     private Task<ApplicationUser> SeedPendingUserAsync(
         string email,
         string requestedRole)
@@ -204,5 +250,20 @@ public sealed class AccountApprovalCharacterizationTests
             "/DepartmentManager/PendingUsers",
             $"/DepartmentManager/ApproveUser/{userId}",
             new Dictionary<string, string>());
+    }
+
+    private sealed class ThrowingIdentifierGenerator
+        : IIdentifierGenerator
+    {
+        public Task<string> GenerateUserCodeAsync(string role)
+        {
+            throw new InvalidOperationException(
+                "Controlled identifier failure.");
+        }
+
+        public Task<string> GenerateWorkItemCodeAsync()
+        {
+            return Task.FromResult("unused");
+        }
     }
 }

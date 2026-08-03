@@ -207,6 +207,83 @@ public sealed class AnalystWorkflowCharacterizationTests
     }
 
     [Fact]
+    public async Task ExpectedStatus_Exactly100Characters_IsAcceptedByBothPaths()
+    {
+        await WithServicesAsync(async services =>
+        {
+            WorkItem saveItem = await TestDataSeeder.CreateWorkItemAsync(
+                services,
+                WorkflowStatus.UnderAnalystReview,
+                analystId: 11);
+            WorkItem submitItem = await TestDataSeeder.CreateWorkItemAsync(
+                services,
+                WorkflowStatus.UnderAnalystReview,
+                analystId: 11);
+            IAnalystWorkflowService service =
+                services.GetRequiredService<IAnalystWorkflowService>();
+            string expectedStatus = new('x', 100);
+
+            var saveResult = await service.SaveAnalysisAsync(
+                new SaveAnalysisDto
+                {
+                    WorkItemId = saveItem.Id,
+                    ExpectedStatus = expectedStatus
+                },
+                11);
+            SubmitForApprovalDto submitDto = CompleteSubmitDto(
+                submitItem.Id);
+            submitDto.ExpectedStatus = expectedStatus;
+            var submitResult = await service.SubmitForApprovalAsync(
+                submitDto,
+                11);
+
+            Assert.True(saveResult.IsSuccess);
+            Assert.True(submitResult.IsSuccess);
+            Assert.Equal(expectedStatus, saveItem.ExpectedStatus);
+            Assert.Equal(expectedStatus, submitItem.ExpectedStatus);
+        });
+    }
+
+    [Fact]
+    public async Task ExpectedStatus_101Characters_IsRejectedByBothPaths()
+    {
+        await WithServicesAsync(async services =>
+        {
+            WorkItem saveItem = await TestDataSeeder.CreateWorkItemAsync(
+                services,
+                WorkflowStatus.UnderAnalystReview,
+                analystId: 11);
+            WorkItem submitItem = await TestDataSeeder.CreateWorkItemAsync(
+                services,
+                WorkflowStatus.UnderAnalystReview,
+                analystId: 11);
+            IAnalystWorkflowService service =
+                services.GetRequiredService<IAnalystWorkflowService>();
+            string expectedStatus = new('x', 101);
+
+            var saveResult = await service.SaveAnalysisAsync(
+                new SaveAnalysisDto
+                {
+                    WorkItemId = saveItem.Id,
+                    ExpectedStatus = expectedStatus
+                },
+                11);
+            SubmitForApprovalDto submitDto = CompleteSubmitDto(
+                submitItem.Id);
+            submitDto.ExpectedStatus = expectedStatus;
+            var submitResult = await service.SubmitForApprovalAsync(
+                submitDto,
+                11);
+
+            Assert.False(saveResult.IsSuccess);
+            Assert.False(submitResult.IsSuccess);
+            Assert.Equal(saveResult.ErrorMessage, submitResult.ErrorMessage);
+            Assert.Null(saveItem.ExpectedStatus);
+            Assert.Null(submitItem.ExpectedStatus);
+        });
+    }
+
+    [Fact]
     public async Task SubmitForApproval_CompleteAnalysis_TransitionsToWaitingManagerApproval()
     {
         await WithServicesAsync(async services =>

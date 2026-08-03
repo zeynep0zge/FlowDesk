@@ -15,6 +15,8 @@ public sealed class ProjectManagerWorkItemService
         "Sadece 'G\u00f6nderildi' durumundaki talepler g\u00fcncellenebilir.";
     private const string DeleteStatusMessage =
         "Sadece 'G\u00f6nderildi' durumundaki talepler silinebilir.";
+    private const string InvalidPriorityMessage =
+        "Geçerli bir öncelik seçiniz.";
 
     private readonly IWorkItemRepository _workItemRepository;
     private readonly IIdentifierGenerator _identifierGenerator;
@@ -58,6 +60,11 @@ public sealed class ProjectManagerWorkItemService
         if (!IsValidUserId(currentUserId))
         {
             return ServiceResult.Forbidden(ForbiddenMessage);
+        }
+
+        if (!IsValidPriority(workItem.Priority))
+        {
+            return ServiceResult.Failure(InvalidPriorityMessage);
         }
 
         try
@@ -117,6 +124,11 @@ public sealed class ProjectManagerWorkItemService
         WorkItem changes,
         int? currentUserId)
     {
+        if (!IsValidPriority(changes.Priority))
+        {
+            return ServiceResult.Failure(InvalidPriorityMessage);
+        }
+
         WorkItem? workItem = await _workItemRepository.GetByIdAsync(id);
         if (workItem == null)
         {
@@ -214,5 +226,10 @@ public sealed class ProjectManagerWorkItemService
     private static bool IsValidUserId(int? currentUserId)
     {
         return currentUserId.HasValue && currentUserId.Value > 0;
+    }
+
+    private static bool IsValidPriority(RequestPriority priority)
+    {
+        return Enum.IsDefined(typeof(RequestPriority), priority);
     }
 }

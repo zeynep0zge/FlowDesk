@@ -145,7 +145,9 @@ namespace FlowDesk.Repositories
         {
             return await _context.WorkItems
                 .AsNoTracking()
-                .Where(x => x.DeveloperId == employeeId)
+                .Where(x =>
+                    x.DeveloperId == employeeId &&
+                    x.WorkflowStatus == WorkflowStatus.Approved)
                 .OrderByDescending(x => x.UpdatedAt ?? x.CreatedAt)
                 .ToListAsync();
         }
@@ -158,7 +160,8 @@ namespace FlowDesk.Repositories
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x =>
                     x.Id == workItemId &&
-                    x.DeveloperId == employeeId);
+                    x.DeveloperId == employeeId &&
+                    x.WorkflowStatus == WorkflowStatus.Approved);
         }
 
         public async Task<WorkItem?> GetByIdAsync(int id)

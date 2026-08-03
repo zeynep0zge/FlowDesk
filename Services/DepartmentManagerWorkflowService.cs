@@ -1,11 +1,9 @@
 using FlowDesk.Common;
 using FlowDesk.DTOs.DepartmentManager;
-using FlowDesk.Constants;
 using FlowDesk.Models;
 using FlowDesk.Repositories.Interfaces;
 using FlowDesk.Services.Interfaces;
 using FlowDesk.ViewModels.DepartmentManager;
-using Microsoft.AspNetCore.Identity;
 
 namespace FlowDesk.Services
 {
@@ -13,21 +11,28 @@ namespace FlowDesk.Services
         : IDepartmentManagerWorkflowService
     {
         private readonly IWorkItemRepository _workItemRepository;
-        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IManagerAccessScopeResolver
+            _managerAccessScopeResolver;
 
         public DepartmentManagerWorkflowService(
             IWorkItemRepository workItemRepository,
-            UserManager<ApplicationUser> userManager)
+            IManagerAccessScopeResolver managerAccessScopeResolver,
+            Microsoft.AspNetCore.Identity.UserManager<ApplicationUser>
+                userManager)
         {
             _workItemRepository = workItemRepository;
+            _managerAccessScopeResolver = managerAccessScopeResolver;
             _userManager = userManager;
         }
+
+        private readonly Microsoft.AspNetCore.Identity.UserManager<
+            ApplicationUser> _userManager;
 
         public async Task<ServiceResult<ManagerInboxViewModel>>
             GetInboxAsync(int? managerUserId)
         {
             ServiceResult<ManagerAccessScope> departmentResult =
-                await GetManagerAccessScopeAsync(managerUserId);
+                await _managerAccessScopeResolver.ResolveAsync(managerUserId);
 
             if (!departmentResult.IsSuccess)
             {
@@ -57,7 +62,7 @@ namespace FlowDesk.Services
                     int? managerUserId)
         {
             ServiceResult<ManagerAccessScope> departmentResult =
-                await GetManagerAccessScopeAsync(managerUserId);
+                await _managerAccessScopeResolver.ResolveAsync(managerUserId);
 
             if (!departmentResult.IsSuccess)
             {
@@ -98,7 +103,7 @@ namespace FlowDesk.Services
             GetReviewAsync(int id, int? managerUserId)
         {
             ServiceResult<ManagerAccessScope> departmentResult =
-                await GetManagerAccessScopeAsync(managerUserId);
+                await _managerAccessScopeResolver.ResolveAsync(managerUserId);
 
             if (!departmentResult.IsSuccess)
             {
@@ -147,7 +152,7 @@ namespace FlowDesk.Services
                 int? managerUserId)
         {
             ServiceResult<ManagerAccessScope> departmentResult =
-                await GetManagerAccessScopeAsync(managerUserId);
+                await _managerAccessScopeResolver.ResolveAsync(managerUserId);
 
             if (!departmentResult.IsSuccess)
             {
@@ -218,7 +223,7 @@ namespace FlowDesk.Services
                 int? managerUserId)
         {
             ServiceResult<ManagerAccessScope> departmentResult =
-                await GetManagerAccessScopeAsync(managerUserId);
+                await _managerAccessScopeResolver.ResolveAsync(managerUserId);
 
             if (!departmentResult.IsSuccess)
             {
@@ -294,7 +299,7 @@ namespace FlowDesk.Services
             GetApprovedRequestsAsync(int? managerUserId)
         {
             ServiceResult<ManagerAccessScope> departmentResult =
-                await GetManagerAccessScopeAsync(managerUserId);
+                await _managerAccessScopeResolver.ResolveAsync(managerUserId);
 
             if (!departmentResult.IsSuccess)
             {
@@ -317,43 +322,6 @@ namespace FlowDesk.Services
             return ServiceResult<
                 List<ManagerInboxItemViewModel>>
                 .Success(viewModels);
-        }
-
-        private async Task<ServiceResult<ManagerAccessScope>>
-            GetManagerAccessScopeAsync(int? managerUserId)
-        {
-            if (!managerUserId.HasValue || managerUserId.Value <= 0)
-            {
-                return ServiceResult<ManagerAccessScope>.Forbidden(
-                    "Gecerli departman yoneticisi kimligi bulunamadi.");
-            }
-
-            ApplicationUser? manager = await _userManager.FindByIdAsync(
-                managerUserId.Value.ToString());
-
-            if (manager == null ||
-                (!DepartmentOptions.Contains(manager.Department) &&
-                 !string.Equals(
-                     manager.Department,
-                     DepartmentOptions.AllDepartments,
-                     StringComparison.Ordinal)) ||
-                !await _userManager.IsInRoleAsync(
-                    manager,
-                    AppRoles.DepartmentManager))
-            {
-                return ServiceResult<ManagerAccessScope>.Forbidden(
-                    "Departman yoneticisi departmani gecersiz.");
-            }
-
-            bool canAccessAllDepartments = string.Equals(
-                manager.Department,
-                DepartmentOptions.AllDepartments,
-                StringComparison.Ordinal);
-
-            return ServiceResult<ManagerAccessScope>.Success(
-                new ManagerAccessScope(
-                    manager.Department!,
-                    canAccessAllDepartments));
         }
 
         private static ManagerInboxItemViewModel

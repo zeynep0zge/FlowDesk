@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.AspNetCore.RateLimiting;
 
 
 namespace FlowDesk.Controllers
@@ -48,6 +49,7 @@ namespace FlowDesk.Controllers
 
         [AllowAnonymous]
         [HttpPost]
+        [EnableRateLimiting(AccountRateLimitPolicies.ForgotPassword)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ForgotPassword(
             ForgotPasswordViewModel model)
@@ -185,6 +187,7 @@ namespace FlowDesk.Controllers
 
         [AllowAnonymous]
         [HttpPost]
+        [EnableRateLimiting(AccountRateLimitPolicies.Register)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Register(RegisterViewModel model)
         {
@@ -274,6 +277,8 @@ namespace FlowDesk.Controllers
 
         [AllowAnonymous]
         [HttpPost]
+        [EnableRateLimiting(
+            AccountRateLimitPolicies.ResendEmailVerification)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ResendEmailVerificationCode(
             string email)

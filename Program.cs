@@ -7,10 +7,51 @@ using FlowDesk.Services.Interfaces;
 using FlowDesk.Models;
 using Microsoft.AspNetCore.Identity;
 using FlowDesk.Options;
+using FlowDesk.Common;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllersWithViews();
+
+int accountRateLimit = Math.Max(
+    1,
+    builder.Configuration.GetValue<int?>(
+        "RateLimiting:Account:PermitLimit") ?? 5);
+int accountRateLimitWindowMinutes = Math.Max(
+    1,
+    builder.Configuration.GetValue<int?>(
+        "RateLimiting:Account:WindowMinutes") ?? 10);
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.ContentType =
+            "text/plain; charset=utf-8";
+        await context.HttpContext.Response.WriteAsync(
+            "Çok fazla istek gönderdiniz. Lütfen daha sonra tekrar deneyin.",
+            cancellationToken);
+    };
+
+    options.AddPolicy(
+        AccountRateLimitPolicies.Register,
+        CreateAccountRateLimitPartitioner(
+            accountRateLimit,
+            accountRateLimitWindowMinutes));
+    options.AddPolicy(
+        AccountRateLimitPolicies.ForgotPassword,
+        CreateAccountRateLimitPartitioner(
+            accountRateLimit,
+            accountRateLimitWindowMinutes));
+    options.AddPolicy(
+        AccountRateLimitPolicies.ResendEmailVerification,
+        CreateAccountRateLimitPartitioner(
+            accountRateLimit,
+            accountRateLimitWindowMinutes));
+});
 
 string connectionString =
     builder.Configuration.GetConnectionString("DefaultConnection")
@@ -79,6 +120,10 @@ builder.Services.AddScoped<
     IAccountApprovalService,
     AccountApprovalService>();
 
+builder.Services.AddScoped<
+    IManagerAccessScopeResolver,
+    ManagerAccessScopeResolver>();
+
 builder.Services.AddScoped<IAnalystWorkflowService, AnalystWorkflowService>();
 
 builder.Services.AddScoped<
@@ -127,6 +172,8 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+app.UseRateLimiter();
+
 app.UseAuthentication();
 
 app.UseAuthorization();
@@ -170,6 +217,22 @@ if (app.Environment.IsDevelopment())
 }
 
 app.Run();
+
+static Func<HttpContext, RateLimitPartition<string>>
+    CreateAccountRateLimitPartitioner(
+        int permitLimit,
+        int windowMinutes)
+{
+    return httpContext => RateLimitPartition.GetFixedWindowLimiter(
+        httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = permitLimit,
+            Window = TimeSpan.FromMinutes(windowMinutes),
+            QueueLimit = 0,
+            AutoReplenishment = true
+        });
+}
 
 public partial class Program
 {

@@ -6,12 +6,18 @@ using FlowDesk.Data;
 using FlowDesk.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
 
 namespace FlowDesk.CharacterizationTests.Authorization;
 
 public sealed class GlobalDepartmentManagerAuthorizationTests
     : DatabaseTestBase
 {
+    public GlobalDepartmentManagerAuthorizationTests()
+        : base(Environments.Development)
+    {
+    }
+
     private const int GlobalManagerId = 9100;
     private static string OtherDepartment => DepartmentOptions.All
         .First(value => value != TestDataSeeder.DefaultDepartment);

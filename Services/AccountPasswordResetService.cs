@@ -230,35 +230,56 @@ namespace FlowDesk.Services
                     "Şifre sıfırlama bağlantısı geçersiz veya süresi dolmuş.");
             }
 
-            string identityToken =
-                await _userManager.GeneratePasswordResetTokenAsync(user);
-
-            IdentityResult result =
-                await _userManager.ResetPasswordAsync(
-                    user,
-                    identityToken,
-                    model.NewPassword);
-
-            if (!result.Succeeded)
+            try
             {
-                return CompletionFailure(result.Errors
-                    .Select(error => new PasswordResetError(
-                        string.Empty,
-                        error.Description))
-                    .ToList());
+                return await _dbContext.Database
+                    .CreateExecutionStrategy()
+                    .ExecuteAsync(async () =>
+                    {
+                        await using var transaction =
+                            await _dbContext.Database
+                                .BeginTransactionAsync();
+
+                        string identityToken = await _userManager
+                            .GeneratePasswordResetTokenAsync(user);
+
+                        IdentityResult result =
+                            await _userManager.ResetPasswordAsync(
+                                user,
+                                identityToken,
+                                model.NewPassword);
+
+                        if (!result.Succeeded)
+                        {
+                            await transaction.RollbackAsync();
+                            return CompletionFailure(result.Errors
+                                .Select(error => new PasswordResetError(
+                                    string.Empty,
+                                    error.Description))
+                                .ToList());
+                        }
+
+                        resetRequest.CompletedAtUtc = DateTime.UtcNow;
+                        resetRequest.IsInvalidated = true;
+                        await _dbContext.SaveChangesAsync();
+
+                        await transaction.CommitAsync();
+                        return new ServiceResult<
+                            PasswordResetCompletionResult>
+                        {
+                            IsSuccess = true,
+                            SuccessMessage = ResetSuccessMessage,
+                            Data = new PasswordResetCompletionResult()
+                        };
+                    });
             }
-
-            resetRequest.CompletedAtUtc = DateTime.UtcNow;
-            resetRequest.IsInvalidated = true;
-
-            await _dbContext.SaveChangesAsync();
-
-            return new ServiceResult<PasswordResetCompletionResult>
+            catch (Exception exception)
+                when (exception is DbUpdateException or
+                      InvalidOperationException)
             {
-                IsSuccess = true,
-                SuccessMessage = ResetSuccessMessage,
-                Data = new PasswordResetCompletionResult()
-            };
+                return CompletionFailure(
+                    "Şifre sıfırlama işlemi tamamlanamadı.");
+            }
         }
 
         private static string HashResetSessionToken(string token)
