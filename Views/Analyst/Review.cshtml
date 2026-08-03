@@ -39,6 +39,67 @@
         </div>
 
         <div class="col-lg-8">
+            <section class="modern-card mb-4" aria-labelledby="ai-rewrite-title">
+                <div class="modern-card-header">
+                    <h2 id="ai-rewrite-title" class="modern-card-title">AI Talep Düzenleme</h2>
+                </div>
+                <div class="p-4">
+                    <p class="text-muted mb-3">
+                        Talep açıklamasını anlamını değiştirmeden daha açık ve düzenli bir biçime dönüştürür.
+                    </p>
+
+                    <form id="aiRewriteForm"
+                          asp-controller="Analyst"
+                          asp-action="RewriteWithAi"
+                          asp-route-id="@Model.Id"
+                          data-save-url="@Url.Action("SaveAiDraft", "Analyst", new { id = Model.Id })"
+                          method="post"
+                          hidden
+                          aria-hidden="true">
+                        @Html.AntiForgeryToken()
+                    </form>
+
+                    <div id="aiRewriteStatus"
+                         class="mt-3"
+                         role="status"
+                         aria-live="polite"
+                         hidden></div>
+
+                    <div id="aiRewriteResult" class="mt-4" hidden>
+                        <div class="mb-4">
+                            <label for="aiRewrittenRequest" class="form-label fw-semibold">Düzenlenmiş Talep</label>
+                            <textarea id="aiRewrittenRequest"
+                                      class="form-control"
+                                      rows="7"></textarea>
+                            <div class="form-text">Bu metni kontrol edebilir ve ihtiyaçlarınıza göre değiştirebilirsiniz.</div>
+                            <div class="mt-3">
+                                <button type="button"
+                                        id="aiDraftSaveButton"
+                                        class="btn btn-primary"
+                                        disabled>
+                                    AI Taslağını Kaydet
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <h3 class="h6">Açıklanan Kısaltmalar</h3>
+                            <ul id="aiAbbreviations" class="mb-0"></ul>
+                        </div>
+
+                        <div class="mb-4">
+                            <h3 class="h6">Belirsiz Noktalar</h3>
+                            <ul id="aiAmbiguities" class="mb-0"></ul>
+                        </div>
+
+                        <div>
+                            <h3 class="h6">Çözümlenemeyen Terimler</h3>
+                            <ul id="aiUnresolvedTerms" class="mb-0"></ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <section class="form-card" aria-labelledby="analysis-form-title">
                 <h2 id="analysis-form-title" class="form-title">Analiz ve atama bilgileri</h2>
                 <form asp-controller="Analyst" asp-action="SaveAnalysis" asp-route-id="@Model.Id" method="post">
@@ -112,4 +173,366 @@
 
 @section Scripts {
     @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const form = document.getElementById("aiRewriteForm");
+            const status = document.getElementById("aiRewriteStatus");
+            const resultSection = document.getElementById("aiRewriteResult");
+            const rewrittenRequest = document.getElementById("aiRewrittenRequest");
+            const abbreviations = document.getElementById("aiAbbreviations");
+            const ambiguities = document.getElementById("aiAmbiguities");
+            const unresolvedTerms = document.getElementById("aiUnresolvedTerms");
+            const saveButton = document.getElementById("aiDraftSaveButton");
+
+            if (!form || !status || !resultSection ||
+                !rewrittenRequest || !abbreviations || !ambiguities ||
+                !unresolvedTerms || !saveButton) {
+                return;
+            }
+
+            let requestInProgress = false;
+            let saveInProgress = false;
+            let automaticRequestStarted = false;
+            let rowVersion = "";
+            const saveButtonText = saveButton.textContent.trim();
+
+            function clearElement(element) {
+                while (element.firstChild) {
+                    element.removeChild(element.firstChild);
+                }
+            }
+
+            function clearResult() {
+                resultSection.hidden = true;
+                rewrittenRequest.value = "";
+                clearElement(abbreviations);
+                clearElement(ambiguities);
+                clearElement(unresolvedTerms);
+                rowVersion = "";
+                saveButton.disabled = true;
+            }
+
+            function setStatus(message, alertType) {
+                status.className = "alert alert-" + alertType + " mt-3";
+                status.textContent = message;
+                status.hidden = false;
+            }
+
+            function showLoadingStatus() {
+                clearElement(status);
+                status.className = "alert alert-info mt-3";
+                status.setAttribute("aria-busy", "true");
+                status.hidden = false;
+
+                const spinner = document.createElement("span");
+                spinner.className = "spinner-border spinner-border-sm me-2";
+                spinner.setAttribute("aria-hidden", "true");
+                status.appendChild(spinner);
+                status.appendChild(document.createTextNode(
+                    "Talep AI tarafından düzenleniyor..."));
+            }
+
+            function showError(message) {
+                setStatus(message, "danger");
+
+                const retryContainer = document.createElement("div");
+                retryContainer.className = "mt-2";
+
+                const retryButton = document.createElement("button");
+                retryButton.type = "button";
+                retryButton.className = "btn btn-outline-danger btn-sm";
+                retryButton.textContent = "Tekrar Dene";
+                retryButton.addEventListener("click", function () {
+                    void runAiRewrite();
+                });
+
+                retryContainer.appendChild(retryButton);
+                status.appendChild(retryContainer);
+            }
+
+            function setSaveLoading(isLoading) {
+                saveButton.disabled = isLoading || !rowVersion;
+                clearElement(saveButton);
+
+                if (isLoading) {
+                    saveButton.setAttribute("aria-busy", "true");
+
+                    const spinner = document.createElement("span");
+                    spinner.className =
+                        "spinner-border spinner-border-sm me-2";
+                    spinner.setAttribute("aria-hidden", "true");
+                    saveButton.appendChild(spinner);
+                    saveButton.appendChild(document.createTextNode(
+                        "Kaydediliyor..."));
+                    return;
+                }
+
+                saveButton.removeAttribute("aria-busy");
+                saveButton.textContent = saveButtonText;
+            }
+
+            function renderList(element, items, emptyMessage, getText) {
+                clearElement(element);
+
+                const values = Array.isArray(items)
+                    ? items
+                        .map(getText)
+                        .filter(function (value) {
+                            return typeof value === "string" &&
+                                value.trim().length > 0;
+                        })
+                    : [];
+
+                if (values.length === 0) {
+                    const emptyItem = document.createElement("li");
+                    emptyItem.textContent = emptyMessage;
+                    element.appendChild(emptyItem);
+                    return;
+                }
+
+                values.forEach(function (value) {
+                    const listItem = document.createElement("li");
+                    listItem.textContent = value;
+                    element.appendChild(listItem);
+                });
+            }
+
+            function getAbbreviationText(item) {
+                if (!item || typeof item !== "object") {
+                    return "";
+                }
+
+                const abbreviation = typeof item.abbreviation === "string"
+                    ? item.abbreviation.trim()
+                    : "";
+                const expandedForm = typeof item.expandedForm === "string"
+                    ? item.expandedForm.trim()
+                    : "";
+                const explanation = typeof item.explanation === "string"
+                    ? item.explanation.trim()
+                    : "";
+
+                let value = abbreviation;
+                if (expandedForm) {
+                    value += (value ? " — " : "") + expandedForm;
+                }
+                if (explanation) {
+                    value += (value ? ": " : "") + explanation;
+                }
+
+                return value;
+            }
+
+            function getText(item) {
+                return typeof item === "string" ? item.trim() : "";
+            }
+
+            function getHttpErrorMessage(response, responseData) {
+                if (response.status === 400) {
+                    return responseData &&
+                        typeof responseData.errorMessage === "string" &&
+                        responseData.errorMessage.trim()
+                        ? responseData.errorMessage
+                        : "Talep AI ile düzenlenemedi.";
+                }
+
+                if (response.status === 403) {
+                    return "Bu işlem için yetkiniz bulunmuyor.";
+                }
+
+                if (response.status === 404) {
+                    return "Talep bulunamadı veya artık erişilemiyor.";
+                }
+
+                if (response.status === 429) {
+                    return "AI kullanım sınırına ulaşıldı. Daha sonra tekrar deneyin.";
+                }
+
+                return "AI işlemi sırasında beklenmeyen bir hata oluştu.";
+            }
+
+            function getSaveErrorMessage(response, responseData) {
+                if ((response.status === 400 || response.status === 409) &&
+                    responseData &&
+                    typeof responseData.errorMessage === "string" &&
+                    responseData.errorMessage.trim()) {
+                    return responseData.errorMessage;
+                }
+
+                if (response.status === 403) {
+                    return "Bu işlem için yetkiniz bulunmuyor.";
+                }
+
+                if (response.status === 404) {
+                    return "AI taslağı bulunamadı.";
+                }
+
+                return "AI taslağı kaydedilemedi.";
+            }
+
+            async function runAiRewrite() {
+                if (requestInProgress) {
+                    return;
+                }
+
+                requestInProgress = true;
+                clearResult();
+                showLoadingStatus();
+
+                try {
+                    const response = await fetch(form.action, {
+                        method: "POST",
+                        body: new FormData(form),
+                        credentials: "same-origin",
+                        headers: {
+                            "X-Requested-With": "XMLHttpRequest"
+                        }
+                    });
+
+                    const contentType =
+                        response.headers.get("content-type") || "";
+                    let responseData = null;
+
+                    if (contentType.toLowerCase().includes("json")) {
+                        try {
+                            responseData = await response.json();
+                        } catch (error) {
+                            responseData = null;
+                        }
+                    }
+
+                    if (!response.ok) {
+                        showError(
+                            getHttpErrorMessage(response, responseData));
+                        return;
+                    }
+
+                    if (!responseData || typeof responseData !== "object") {
+                        showError(
+                            "AI işlemi sırasında beklenmeyen bir hata oluştu.");
+                        return;
+                    }
+
+                    if (typeof responseData.rowVersion !== "string" ||
+                        !responseData.rowVersion.trim()) {
+                        showError(
+                            "AI işlemi sırasında beklenmeyen bir hata oluştu.");
+                        return;
+                    }
+
+                    rowVersion = responseData.rowVersion;
+
+                    rewrittenRequest.value =
+                        typeof responseData.rewrittenRequest === "string"
+                            ? responseData.rewrittenRequest
+                            : "";
+
+                    renderList(
+                        abbreviations,
+                        responseData.abbreviations,
+                        "Açıklanan kısaltma bulunamadı.",
+                        getAbbreviationText);
+                    renderList(
+                        ambiguities,
+                        responseData.ambiguities,
+                        "Belirsiz nokta bulunamadı.",
+                        getText);
+                    renderList(
+                        unresolvedTerms,
+                        responseData.unresolvedTerms,
+                        "Çözümlenemeyen terim bulunamadı.",
+                        getText);
+
+                    resultSection.hidden = false;
+                    saveButton.disabled = false;
+                    setStatus(
+                        "Talep AI tarafından düzenlendi. Sonucu kontrol edip değiştirebilirsiniz.",
+                        "success");
+                    rewrittenRequest.focus();
+                } catch (error) {
+                    if (error && error.name === "AbortError") {
+                        return;
+                    }
+
+                    showError(
+                        "Sunucuya bağlantı kurulamadı. Lütfen tekrar deneyin.");
+                } finally {
+                    requestInProgress = false;
+                    status.removeAttribute("aria-busy");
+                }
+            }
+
+            async function saveAiDraft() {
+                if (saveInProgress || requestInProgress || !rowVersion) {
+                    return;
+                }
+
+                saveInProgress = true;
+                setSaveLoading(true);
+
+                try {
+                    const formData = new FormData(form);
+                    formData.append("EditedRequest", rewrittenRequest.value);
+                    formData.append("RowVersion", rowVersion);
+
+                    const response = await fetch(form.dataset.saveUrl, {
+                        method: "POST",
+                        body: formData,
+                        credentials: "same-origin",
+                        headers: {
+                            "X-Requested-With": "XMLHttpRequest"
+                        }
+                    });
+
+                    const contentType =
+                        response.headers.get("content-type") || "";
+                    let responseData = null;
+
+                    if (contentType.toLowerCase().includes("json")) {
+                        try {
+                            responseData = await response.json();
+                        } catch (error) {
+                            responseData = null;
+                        }
+                    }
+
+                    if (!response.ok) {
+                        setStatus(
+                            getSaveErrorMessage(response, responseData),
+                            "danger");
+                        return;
+                    }
+
+                    if (!responseData ||
+                        typeof responseData.rowVersion !== "string" ||
+                        !responseData.rowVersion.trim()) {
+                        setStatus("AI taslağı kaydedilemedi.", "danger");
+                        return;
+                    }
+
+                    rowVersion = responseData.rowVersion;
+                    setStatus(
+                        "AI taslağındaki değişiklikler kaydedildi.",
+                        "success");
+                } catch (error) {
+                    setStatus(
+                        "Sunucuya bağlantı kurulamadı. Lütfen tekrar deneyin.",
+                        "danger");
+                } finally {
+                    saveInProgress = false;
+                    setSaveLoading(false);
+                }
+            }
+
+            saveButton.addEventListener("click", function () {
+                void saveAiDraft();
+            });
+
+            if (!automaticRequestStarted) {
+                automaticRequestStarted = true;
+                void runAiRewrite();
+            }
+        });
+    </script>
 }

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using FlowDesk.Models;
+using FlowDesk.Ai.Entities;
 
 namespace FlowDesk.Data
 {
@@ -15,6 +16,7 @@ namespace FlowDesk.Data
         public DbSet<PasswordResetRequest> PasswordResetRequests { get; set; }
         public DbSet<EmailVerificationRequest> EmailVerificationRequests { get; set; }
         public DbSet<WorkItem> WorkItems { get; set; }
+        public DbSet<WorkItemAiDraft> WorkItemAiDrafts { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -58,6 +60,43 @@ namespace FlowDesk.Data
                 .HasIndex(x => x.RequestNumber)
 
                 .IsUnique();
+
+            modelBuilder.Entity<WorkItemAiDraft>(entity =>
+            {
+                entity.ToTable("WorkItemAiDrafts");
+                entity.HasKey(draft => draft.Id);
+
+                entity.Property(draft => draft.GeneratedRequest)
+                    .IsRequired()
+                    .HasMaxLength(WorkItemAiDraft.RequestMaximumLength);
+                entity.Property(draft => draft.EditedRequest)
+                    .IsRequired()
+                    .HasMaxLength(WorkItemAiDraft.RequestMaximumLength);
+                entity.Property(draft => draft.AbbreviationsJson)
+                    .IsRequired();
+                entity.Property(draft => draft.AmbiguitiesJson)
+                    .IsRequired();
+                entity.Property(draft => draft.UnresolvedTermsJson)
+                    .IsRequired();
+                entity.Property(draft => draft.ModelName)
+                    .IsRequired()
+                    .HasMaxLength(WorkItemAiDraft.ModelNameMaximumLength);
+                entity.Property(draft => draft.GeneratedAt)
+                    .IsRequired();
+                entity.Property(draft => draft.UpdatedAt)
+                    .IsRequired();
+                entity.Property(draft => draft.RowVersion)
+                    .IsRowVersion()
+                    .IsRequired();
+
+                entity.HasIndex(draft => draft.WorkItemId)
+                    .IsUnique();
+                entity.HasOne(draft => draft.WorkItem)
+                    .WithMany()
+                    .HasForeignKey(draft => draft.WorkItemId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
         }
     }
 }
