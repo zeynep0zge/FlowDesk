@@ -84,50 +84,60 @@ namespace FlowDesk.Repositories
         }
 
         public async Task<List<WorkItem>>
-            GetWaitingManagerApprovalAsync(string department)
+            GetWaitingManagerApprovalAsync(
+                string department,
+                bool canAccessAllDepartments)
         {
             return await _context.WorkItems
                 .AsNoTracking()
                 .Where(x =>
                     x.WorkflowStatus ==
                         WorkflowStatus.WaitingManagerApproval &&
-                    x.Department == department)
+                    (canAccessAllDepartments ||
+                     x.Department == department))
                 .OrderByDescending(x => x.UpdatedAt ?? x.CreatedAt)
                 .ToListAsync();
         }
 
         public async Task<List<WorkItem>>
-            GetApprovedRequestsAsync(string department)
+            GetApprovedRequestsAsync(
+                string department,
+                bool canAccessAllDepartments)
         {
             return await _context.WorkItems
                 .AsNoTracking()
                 .Where(x =>
                     x.WorkflowStatus ==
                         WorkflowStatus.Approved &&
-                    x.Department == department)
+                    (canAccessAllDepartments ||
+                     x.Department == department))
                 .OrderByDescending(x => x.UpdatedAt ?? x.CreatedAt)
                 .ToListAsync();
         }
 
-        public async Task<WorkItem?> GetByIdInDepartmentAsync(
+        public async Task<WorkItem?> GetManagerWorkItemByIdAsync(
             int id,
-            string department)
+            string department,
+            bool canAccessAllDepartments)
         {
             return await _context.WorkItems.FirstOrDefaultAsync(
                 x => x.Id == id &&
-                     x.Department == department);
+                     (canAccessAllDepartments ||
+                      x.Department == department));
         }
 
         public async Task<WorkItem?>
-            GetByIdInDepartmentAsNoTrackingAsync(
+            GetManagerWorkItemByIdAsNoTrackingAsync(
                 int id,
-                string department)
+                string department,
+                bool canAccessAllDepartments)
         {
             return await _context.WorkItems
                 .AsNoTracking()
                 .FirstOrDefaultAsync(
                     x => x.Id == id &&
-                         x.Department == department);
+                         (canAccessAllDepartments ||
+                          x.Department == department));
         }
 
         public async Task<List<WorkItem>>
@@ -135,7 +145,9 @@ namespace FlowDesk.Repositories
         {
             return await _context.WorkItems
                 .AsNoTracking()
-                .Where(x => x.DeveloperId == employeeId)
+                .Where(x =>
+                    x.DeveloperId == employeeId &&
+                    x.WorkflowStatus == WorkflowStatus.Approved)
                 .OrderByDescending(x => x.UpdatedAt ?? x.CreatedAt)
                 .ToListAsync();
         }
@@ -148,7 +160,8 @@ namespace FlowDesk.Repositories
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x =>
                     x.Id == workItemId &&
-                    x.DeveloperId == employeeId);
+                    x.DeveloperId == employeeId &&
+                    x.WorkflowStatus == WorkflowStatus.Approved);
         }
 
         public async Task<WorkItem?> GetByIdAsync(int id)

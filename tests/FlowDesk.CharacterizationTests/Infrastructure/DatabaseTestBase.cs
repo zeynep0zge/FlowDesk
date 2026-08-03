@@ -5,7 +5,12 @@ namespace FlowDesk.CharacterizationTests.Infrastructure;
 
 public abstract class DatabaseTestBase : IAsyncLifetime
 {
-    protected FlowDeskWebApplicationFactory Factory { get; } = new();
+    protected DatabaseTestBase(string environmentName = "Testing")
+    {
+        Factory = new FlowDeskWebApplicationFactory(environmentName);
+    }
+
+    protected FlowDeskWebApplicationFactory Factory { get; }
 
     public Task InitializeAsync()
     {
@@ -20,12 +25,14 @@ public abstract class DatabaseTestBase : IAsyncLifetime
 
     protected HttpClient CreateClient()
     {
-        return Factory.CreateClient(
+        HttpClient client = Factory.CreateClient(
             new WebApplicationFactoryClientOptions
             {
                 AllowAutoRedirect = false,
                 BaseAddress = new Uri("https://localhost")
             });
+        client.Timeout = TimeSpan.FromSeconds(15);
+        return client;
     }
 
     protected async Task<TResult> WithServicesAsync<TResult>(

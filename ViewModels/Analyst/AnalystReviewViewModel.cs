@@ -1,4 +1,5 @@
-﻿using FlowDesk.Models;
+using FlowDesk.Models;
+using FlowDesk.Constants;
 
 namespace FlowDesk.ViewModels.Analyst
 {
@@ -23,7 +24,12 @@ namespace FlowDesk.ViewModels.Analyst
         // Analistin düzenleyebileceği alanlar.
         public int? AnalystId { get; set; }
 
+        public string AnalystDisplayName { get; set; } = string.Empty;
+
         public int? DeveloperId { get; set; }
+
+        public List<UserSelectionOptionViewModel> DeveloperOptions
+            { get; set; } = [];
 
         public DateTime? ReleaseDate { get; set; }
 
@@ -40,12 +46,6 @@ namespace FlowDesk.ViewModels.Analyst
 
         // Mevcut statü seçim kutusunda gösterilecek seçenekler.
         public List<string> CurrentStatusOptions { get; set; } =
-        [
-            "Analist İncelemesinde",
-            "Geliştirme Bekliyor",
-            "Geliştirme Devam Ediyor",
-            "Test Bekliyor",
-            "Sürüme Hazır"
-        ];
+            [.. AnalystCurrentStatusOptions.All];
     }
 }

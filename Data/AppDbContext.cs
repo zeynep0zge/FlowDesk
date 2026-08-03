@@ -48,6 +48,11 @@ namespace FlowDesk.Data
                 .Property(x => x.IsApproved)
                 .HasDefaultValue(true);
 
+            modelBuilder.Entity<ApplicationUser>()
+                .HasIndex(x => x.BusinessCode)
+                .IsUnique()
+                .HasFilter("[BusinessCode] IS NOT NULL");
+
             modelBuilder.Entity<WorkItem>()
 
                 .HasIndex(x => x.RequestNumber)

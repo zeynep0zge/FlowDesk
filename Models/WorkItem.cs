@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
+using FlowDesk.Constants;
 
 namespace FlowDesk.Models
 {
@@ -79,10 +80,11 @@ namespace FlowDesk.Models
         [Display(Name = "Beklenen Statü")]
         public string? ExpectedStatus { get; set; }
 
-        [StringLength(100)]
+        [StringLength(AnalystCurrentStatusOptions.MaximumLength)]
         [Display(Name = "Mevcut Statü")]
         public string CurrentStatus { get; set; }
-            = "Analist İncelemesi Bekliyor";
+            = WorkflowStatusDescriptions.GetDescription(
+                WorkflowStatus.Submitted);
 
         [StringLength(1000)]
         [Display(Name = "Analist Notu")]

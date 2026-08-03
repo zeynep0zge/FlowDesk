@@ -31,6 +31,38 @@ public sealed class EmployeeAuthorizationTests : DatabaseTestBase
         Assert.DoesNotContain(unassigned.RequestNumber, body);
     }
 
+    [Theory]
+    [InlineData(WorkflowStatus.UnderAnalystReview)]
+    [InlineData(WorkflowStatus.ReturnedToAnalyst)]
+    [InlineData(WorkflowStatus.WaitingManagerApproval)]
+    public async Task Index_NonApprovedAssignedWorkItem_IsNotVisible(
+        WorkflowStatus status)
+    {
+        WorkItem workItem = await CreateWorkItemAsync(22, status);
+        using HttpClient client = EmployeeClient(22);
+
+        HttpResponseMessage response =
+            await client.GetAsync("/Employee/Index");
+        string body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.DoesNotContain(workItem.RequestNumber, body);
+    }
+
+    [Fact]
+    public async Task Details_NonApprovedAssignedWorkItem_IsNotFound()
+    {
+        WorkItem workItem = await CreateWorkItemAsync(
+            22,
+            WorkflowStatus.WaitingManagerApproval);
+        using HttpClient client = EmployeeClient(22);
+
+        HttpResponseMessage response = await client.GetAsync(
+            $"/Employee/Details/{workItem.Id}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     [Fact]
     public async Task Details_CurrentEmployeesWorkItem_IsVisibleAndReadOnly()
     {
@@ -160,12 +192,14 @@ public sealed class EmployeeAuthorizationTests : DatabaseTestBase
             TestDataSeeder.UniqueEmail($"employee-{userId}"));
     }
 
-    private Task<WorkItem> CreateWorkItemAsync(int? developerId)
+    private Task<WorkItem> CreateWorkItemAsync(
+        int? developerId,
+        WorkflowStatus status = WorkflowStatus.Approved)
     {
         return WithServicesAsync(services =>
             TestDataSeeder.CreateWorkItemAsync(
                 services,
-                WorkflowStatus.Assigned,
+                status,
                 developerId: developerId));
     }
 

@@ -15,19 +15,8 @@
 @functions {
     public string GetWorkflowStatusText(FlowDesk.Models.WorkflowStatus status)
     {
-        return status switch
-        {
-            FlowDesk.Models.WorkflowStatus.Submitted => "Gönderildi",
-            FlowDesk.Models.WorkflowStatus.UnderAnalystReview => "Analiz Sürecinde",
-            FlowDesk.Models.WorkflowStatus.WaitingManagerApproval => "Yönetici Onayında",
-            FlowDesk.Models.WorkflowStatus.ReturnedToAnalyst => "Analiste İade Edildi",
-            FlowDesk.Models.WorkflowStatus.Approved => "Onaylandı",
-            FlowDesk.Models.WorkflowStatus.Assigned => "Yazılımcıya Atandı",
-            FlowDesk.Models.WorkflowStatus.InProgress => "Geliştiriliyor",
-            FlowDesk.Models.WorkflowStatus.Completed => "Tamamlandı",
-            FlowDesk.Models.WorkflowStatus.Rejected => "Reddedildi",
-            _ => status.ToString()
-        };
+        return FlowDesk.Models.WorkflowStatusDescriptions.GetDescription(
+            status);
     }
 
     public string GetWorkflowStatusClass(FlowDesk.Models.WorkflowStatus status)

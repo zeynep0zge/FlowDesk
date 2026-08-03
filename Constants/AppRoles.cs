@@ -43,5 +43,17 @@ namespace FlowDesk.Constants
                 _ => role ?? string.Empty
             };
         }
+
+        public static string? GetBusinessCodePrefix(string? role)
+        {
+            return role switch
+            {
+                ProjectManager => "ISB",
+                Analyst => "ANL",
+                DepartmentManager => "DYN",
+                Employee => "ENG",
+                _ => null
+            };
+        }
     }
 }

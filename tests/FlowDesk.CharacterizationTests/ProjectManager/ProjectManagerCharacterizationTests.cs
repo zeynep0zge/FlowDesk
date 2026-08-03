@@ -30,9 +30,13 @@ public sealed class ProjectManagerCharacterizationTests
         WorkItem? workItem = await WithServicesAsync(async services =>
             await services.GetRequiredService<AppDbContext>()
                 .WorkItems.AsNoTracking()
-                .SingleOrDefaultAsync(x => x.RequestNumber == requestNumber));
+                .SingleOrDefaultAsync());
 
         Assert.NotNull(workItem);
+        Assert.NotEqual(requestNumber, workItem.RequestNumber);
+        Assert.Matches(
+            @"^TLP-\d{8}-\d{4}$",
+            workItem.RequestNumber);
         Assert.Equal("Characterization request", workItem.RequestDescription);
         Assert.Equal(TestDataSeeder.DefaultDepartment, workItem.Department);
         Assert.Equal(RequestPriority.High, workItem.Priority);
@@ -57,7 +61,7 @@ public sealed class ProjectManagerCharacterizationTests
         int? createdByUserId = await WithServicesAsync(async services =>
             await services.GetRequiredService<AppDbContext>()
                 .WorkItems.AsNoTracking()
-                .Where(x => x.RequestNumber == requestNumber)
+                .Where(x => x.CreatedByUserId == userId)
                 .Select(x => x.CreatedByUserId)
                 .SingleAsync());
 
@@ -99,7 +103,8 @@ public sealed class ProjectManagerCharacterizationTests
                 .WorkItems.AsNoTracking()
                 .SingleAsync(x => x.Id == seeded.Id));
 
-        Assert.Equal(updatedNumber, updated.RequestNumber);
+        Assert.Equal(seeded.RequestNumber, updated.RequestNumber);
+        Assert.NotEqual(updatedNumber, updated.RequestNumber);
         Assert.Equal("Updated description", updated.RequestDescription);
         Assert.Equal(RequestPriority.Critical, updated.Priority);
         Assert.NotNull(updated.UpdatedAt);
@@ -159,6 +164,65 @@ public sealed class ProjectManagerCharacterizationTests
                 .WorkItems.CountAsync());
 
         Assert.Equal(0, count);
+    }
+
+    [Fact]
+    public async Task Create_UndefinedPriority_DoesNotCreateWorkItem()
+    {
+        using HttpClient client = CreateClient().AuthenticateAs(
+            405,
+            AppRoles.ProjectManager,
+            TestDataSeeder.UniqueEmail("pm-invalid-priority"));
+        Dictionary<string, string> form = ValidWorkItemForm(
+            TestDataSeeder.UniqueRequestNumber("invalid-priority"));
+        form["Priority"] = "999";
+
+        HttpResponseMessage response =
+            await client.PostFormWithAntiforgeryAsync(
+                "/ProjectManager/Create",
+                "/ProjectManager/Create",
+                form);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        int count = await WithServicesAsync(async services =>
+            await services.GetRequiredService<AppDbContext>()
+                .WorkItems.CountAsync());
+        Assert.Equal(0, count);
+    }
+
+    [Fact]
+    public async Task Edit_UndefinedPriority_DoesNotUpdateWorkItem()
+    {
+        const int userId = 406;
+        WorkItem seeded = await WithServicesAsync(services =>
+            TestDataSeeder.CreateWorkItemAsync(
+                services,
+                WorkflowStatus.Submitted,
+                userId));
+        using HttpClient client = CreateClient().AuthenticateAs(
+            userId,
+            AppRoles.ProjectManager,
+            TestDataSeeder.UniqueEmail("pm-edit-invalid-priority"));
+
+        HttpResponseMessage response =
+            await client.PostFormWithAntiforgeryAsync(
+                $"/ProjectManager/Edit/{seeded.Id}",
+                $"/ProjectManager/Edit/{seeded.Id}",
+                new Dictionary<string, string>
+                {
+                    ["Id"] = seeded.Id.ToString(),
+                    ["RequestDescription"] = "Should not persist",
+                    ["Department"] = TestDataSeeder.DefaultDepartment,
+                    ["Priority"] = "999"
+                });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        WorkItem unchanged = await WithServicesAsync(async services =>
+            await services.GetRequiredService<AppDbContext>()
+                .WorkItems.AsNoTracking()
+                .SingleAsync(x => x.Id == seeded.Id));
+        Assert.Equal(RequestPriority.Normal, unchanged.Priority);
+        Assert.NotEqual("Should not persist", unchanged.RequestDescription);
     }
 
     private static Dictionary<string, string> ValidWorkItemForm(

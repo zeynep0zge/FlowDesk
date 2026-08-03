@@ -1,4 +1,4 @@
-﻿using ClosedXML.Excel;
+using ClosedXML.Excel;
 using FlowDesk.Models;
 using FlowDesk.Services.Interfaces;
 using FlowDesk.ViewModels.DepartmentManager;
@@ -239,37 +239,8 @@ namespace FlowDesk.Services
         private static string GetWorkflowStatusText(
             WorkflowStatus workflowStatus)
         {
-            return workflowStatus switch
-            {
-                WorkflowStatus.Submitted =>
-                    "Yeni Talep",
-
-                WorkflowStatus.UnderAnalystReview =>
-                    "Analist İncelemesinde",
-
-                WorkflowStatus.WaitingManagerApproval =>
-                    "Yönetici Onayı Bekliyor",
-
-                WorkflowStatus.ReturnedToAnalyst =>
-                    "Analiste İade Edildi",
-
-                WorkflowStatus.Approved =>
-                    "Onaylandı",
-
-                WorkflowStatus.Assigned =>
-                    "Atandı",
-
-                WorkflowStatus.InProgress =>
-                    "Devam Ediyor",
-
-                WorkflowStatus.Completed =>
-                    "Tamamlandı",
-
-                WorkflowStatus.Rejected =>
-                    "Reddedildi",
-
-                _ => workflowStatus.ToString()
-            };
+            return WorkflowStatusDescriptions.GetDescription(
+                workflowStatus);
         }
     }
 }

@@ -3,281 +3,233 @@ using FlowDesk.Models;
 using FlowDesk.Repositories.Interfaces;
 using FlowDesk.Services.Interfaces;
 
-namespace FlowDesk.Services
+namespace FlowDesk.Services;
+
+public sealed class ProjectManagerWorkItemService
+    : IProjectManagerWorkItemService
 {
-    public sealed class ProjectManagerWorkItemService
-        : IProjectManagerWorkItemService
+    private const string NotFoundMessage = "Talep bulunamad\u0131.";
+    private const string ForbiddenMessage =
+        "Bu talebe eri\u015fim yetkiniz bulunmuyor.";
+    private const string EditStatusMessage =
+        "Sadece 'G\u00f6nderildi' durumundaki talepler g\u00fcncellenebilir.";
+    private const string DeleteStatusMessage =
+        "Sadece 'G\u00f6nderildi' durumundaki talepler silinebilir.";
+    private const string InvalidPriorityMessage =
+        "Geçerli bir öncelik seçiniz.";
+
+    private readonly IWorkItemRepository _workItemRepository;
+    private readonly IIdentifierGenerator _identifierGenerator;
+
+    public ProjectManagerWorkItemService(
+        IWorkItemRepository workItemRepository,
+        IIdentifierGenerator identifierGenerator)
     {
-        private const string NotFoundMessage =
-            "Talep bulunamadı.";
+        _workItemRepository = workItemRepository;
+        _identifierGenerator = identifierGenerator;
+    }
 
-        private const string ForbiddenMessage =
-            "Bu talebe erişim yetkiniz bulunmuyor.";
-
-        private const string DuplicateRequestNumberMessage =
-            "Bu talep numarası daha önce kullanılmış.";
-
-        private const string EditStatusMessage =
-            "Sadece 'Gönderildi' durumundaki talepler güncellenebilir.";
-
-        private const string DeleteStatusMessage =
-            "Sadece 'Gönderildi' durumundaki talepler silinebilir.";
-
-        private readonly IWorkItemRepository _workItemRepository;
-
-        public ProjectManagerWorkItemService(
-            IWorkItemRepository workItemRepository)
+    public async Task<ServiceResult<List<WorkItem>>> GetMyRequestsAsync(
+        int? currentUserId)
+    {
+        if (!IsValidUserId(currentUserId))
         {
-            _workItemRepository = workItemRepository;
+            return ServiceResult<List<WorkItem>>.Forbidden(
+                ForbiddenMessage);
         }
 
-        public async Task<ServiceResult<List<WorkItem>>>
-            GetMyRequestsAsync(int? currentUserId)
+        List<WorkItem> workItems = await _workItemRepository
+            .GetProjectManagerRequestsAsync(
+                currentUserId.GetValueOrDefault());
+        return ServiceResult<List<WorkItem>>.Success(workItems);
+    }
+
+    public async Task<ServiceResult<WorkItem>> GetDetailsAsync(
+        int id,
+        int? currentUserId)
+    {
+        WorkItem? workItem =
+            await _workItemRepository.GetByIdAsNoTrackingAsync(id);
+        return AuthorizeRead(workItem, currentUserId);
+    }
+
+    public async Task<ServiceResult> CreateAsync(
+        WorkItem workItem,
+        int? currentUserId)
+    {
+        if (!IsValidUserId(currentUserId))
         {
-            if (!IsValidUserId(currentUserId))
-            {
-                return ServiceResult<List<WorkItem>>.Forbidden(
-                    ForbiddenMessage);
-            }
-
-            List<WorkItem> workItems =
-                await _workItemRepository
-                    .GetProjectManagerRequestsAsync(
-                        currentUserId.GetValueOrDefault());
-
-            return ServiceResult<List<WorkItem>>
-                .Success(workItems);
+            return ServiceResult.Forbidden(ForbiddenMessage);
         }
 
-        public async Task<ServiceResult<WorkItem>> GetDetailsAsync(
-            int id,
-            int? currentUserId)
+        if (!IsValidPriority(workItem.Priority))
         {
-            WorkItem? workItem = await _workItemRepository
-                .GetByIdAsNoTrackingAsync(id);
-
-            if (workItem == null)
-            {
-                return ServiceResult<WorkItem>
-                    .NotFound(NotFoundMessage);
-            }
-
-            if (IsForbidden(workItem, currentUserId))
-            {
-                return ServiceResult<WorkItem>
-                    .Forbidden(ForbiddenMessage);
-            }
-
-            return ServiceResult<WorkItem>.Success(workItem);
+            return ServiceResult.Failure(InvalidPriorityMessage);
         }
 
-        public async Task<ServiceResult<string>>
-            ValidateCreateAsync(string requestNumber)
+        try
         {
-            string normalizedRequestNumber = requestNumber.Trim();
-
-            bool requestNumberExists =
-                await _workItemRepository.RequestNumberExistsAsync(
-                    normalizedRequestNumber);
-
-            if (requestNumberExists)
-            {
-                return ServiceResult<string>
-                    .Failure(DuplicateRequestNumberMessage);
-            }
-
-            return ServiceResult<string>
-                .Success(normalizedRequestNumber);
+            workItem.RequestNumber =
+                await _identifierGenerator.GenerateWorkItemCodeAsync();
+        }
+        catch (InvalidOperationException)
+        {
+            return ServiceResult.Failure(
+                "Talep numaras\u0131 olu\u015fturulamad\u0131.");
         }
 
-        public async Task<ServiceResult> CreateAsync(
-            WorkItem workItem,
-            string normalizedRequestNumber,
-            int? currentUserId)
+        workItem.RequestDescription = workItem.RequestDescription.Trim();
+        workItem.Department = workItem.Department.Trim();
+        workItem.CreatedByUserId = currentUserId.GetValueOrDefault();
+        workItem.WorkflowStatus = WorkflowStatus.Submitted;
+        workItem.CurrentStatus = WorkflowStatusDescriptions.GetDescription(
+            WorkflowStatus.Submitted);
+        workItem.CreatedAt = DateTime.UtcNow;
+        workItem.UpdatedAt = null;
+        workItem.ApprovedAt = null;
+        workItem.AnalystId = null;
+        workItem.DeveloperId = null;
+        workItem.ReleaseDate = null;
+        workItem.BanksoftDeliveryDate = null;
+        workItem.ExpectedStatus = null;
+        workItem.AnalystNote = null;
+        workItem.ManagerNote = null;
+
+        _workItemRepository.Add(workItem);
+        await _workItemRepository.SaveChangesAsync();
+        return ServiceResult.Success();
+    }
+
+    public async Task<ServiceResult<WorkItem>> GetForEditAsync(
+        int id,
+        int? currentUserId)
+    {
+        WorkItem? workItem = await _workItemRepository.GetByIdAsync(id);
+        ServiceResult<WorkItem> access =
+            AuthorizeRead(workItem, currentUserId);
+
+        if (!access.IsSuccess)
         {
-            if (!IsValidUserId(currentUserId))
-            {
-                return ServiceResult.Forbidden(ForbiddenMessage);
-            }
-
-            workItem.RequestNumber = normalizedRequestNumber;
-            workItem.RequestDescription =
-                workItem.RequestDescription.Trim();
-            workItem.Department = workItem.Department.Trim();
-            workItem.CreatedByUserId = currentUserId.GetValueOrDefault();
-            workItem.WorkflowStatus = WorkflowStatus.Submitted;
-            workItem.CurrentStatus =
-                "Analist İncelemesi Bekliyor";
-            workItem.CreatedAt = DateTime.UtcNow;
-            workItem.UpdatedAt = null;
-            workItem.ApprovedAt = null;
-            workItem.AnalystId = null;
-            workItem.DeveloperId = null;
-            workItem.ReleaseDate = null;
-            workItem.BanksoftDeliveryDate = null;
-            workItem.ExpectedStatus = null;
-            workItem.AnalystNote = null;
-            workItem.ManagerNote = null;
-
-            _workItemRepository.Add(workItem);
-            await _workItemRepository.SaveChangesAsync();
-
-            return ServiceResult.Success();
+            return access;
         }
 
-        public async Task<ServiceResult<WorkItem>> GetForEditAsync(
-            int id,
-            int? currentUserId)
+        return WorkflowStatusPolicy.CanProjectManagerEdit(
+            workItem!.WorkflowStatus)
+            ? ServiceResult<WorkItem>.Success(workItem)
+            : ServiceResult<WorkItem>.Failure(EditStatusMessage);
+    }
+
+    public async Task<ServiceResult> UpdateAsync(
+        int id,
+        WorkItem changes,
+        int? currentUserId)
+    {
+        if (!IsValidPriority(changes.Priority))
         {
-            WorkItem? workItem =
-                await _workItemRepository.GetByIdAsync(id);
-
-            if (workItem == null)
-            {
-                return ServiceResult<WorkItem>
-                    .NotFound(NotFoundMessage);
-            }
-
-            if (IsForbidden(workItem, currentUserId))
-            {
-                return ServiceResult<WorkItem>
-                    .Forbidden(ForbiddenMessage);
-            }
-
-            if (workItem.WorkflowStatus != WorkflowStatus.Submitted)
-            {
-                return ServiceResult<WorkItem>
-                    .Failure(EditStatusMessage);
-            }
-
-            return ServiceResult<WorkItem>.Success(workItem);
+            return ServiceResult.Failure(InvalidPriorityMessage);
         }
 
-        public async Task<ServiceResult<string>> ValidateUpdateAsync(
-            int id,
-            string requestNumber)
+        WorkItem? workItem = await _workItemRepository.GetByIdAsync(id);
+        if (workItem == null)
         {
-            string normalizedRequestNumber = requestNumber.Trim();
-
-            bool requestNumberExists =
-                await _workItemRepository.RequestNumberExistsAsync(
-                    normalizedRequestNumber,
-                    id);
-
-            if (requestNumberExists)
-            {
-                return ServiceResult<string>
-                    .Failure(DuplicateRequestNumberMessage);
-            }
-
-            return ServiceResult<string>
-                .Success(normalizedRequestNumber);
+            return ServiceResult.NotFound(NotFoundMessage);
         }
 
-        public async Task<ServiceResult> UpdateAsync(
-            int id,
-            WorkItem changes,
-            string normalizedRequestNumber,
-            int? currentUserId)
+        if (IsForbidden(workItem, currentUserId))
         {
-            WorkItem? workItem =
-                await _workItemRepository.GetByIdAsync(id);
-
-            if (workItem == null)
-            {
-                return ServiceResult.NotFound(NotFoundMessage);
-            }
-
-            if (IsForbidden(workItem, currentUserId))
-            {
-                return ServiceResult.Forbidden(ForbiddenMessage);
-            }
-
-            if (workItem.WorkflowStatus != WorkflowStatus.Submitted)
-            {
-                return ServiceResult.Failure(EditStatusMessage);
-            }
-
-            workItem.RequestNumber = normalizedRequestNumber;
-            workItem.RequestDescription =
-                changes.RequestDescription.Trim();
-            workItem.Department = changes.Department.Trim();
-            workItem.Priority = changes.Priority;
-            workItem.UpdatedAt = DateTime.UtcNow;
-
-            await _workItemRepository.SaveChangesAsync();
-
-            return ServiceResult.Success();
+            return ServiceResult.Forbidden(ForbiddenMessage);
         }
 
-        public async Task<ServiceResult<WorkItem>> GetForDeleteAsync(
-            int id,
-            int? currentUserId)
+        if (!WorkflowStatusPolicy.CanProjectManagerEdit(
+                workItem.WorkflowStatus))
         {
-            WorkItem? workItem = await _workItemRepository
-                .GetByIdAsNoTrackingAsync(id);
-
-            if (workItem == null)
-            {
-                return ServiceResult<WorkItem>
-                    .NotFound(NotFoundMessage);
-            }
-
-            if (IsForbidden(workItem, currentUserId))
-            {
-                return ServiceResult<WorkItem>
-                    .Forbidden(ForbiddenMessage);
-            }
-
-            if (workItem.WorkflowStatus != WorkflowStatus.Submitted)
-            {
-                return ServiceResult<WorkItem>
-                    .Failure(DeleteStatusMessage);
-            }
-
-            return ServiceResult<WorkItem>.Success(workItem);
+            return ServiceResult.Failure(EditStatusMessage);
         }
 
-        public async Task<ServiceResult> DeleteAsync(
-            int id,
-            int? currentUserId)
+        workItem.RequestDescription = changes.RequestDescription.Trim();
+        workItem.Department = changes.Department.Trim();
+        workItem.Priority = changes.Priority;
+        workItem.UpdatedAt = DateTime.UtcNow;
+        await _workItemRepository.SaveChangesAsync();
+        return ServiceResult.Success();
+    }
+
+    public async Task<ServiceResult<WorkItem>> GetForDeleteAsync(
+        int id,
+        int? currentUserId)
+    {
+        WorkItem? workItem =
+            await _workItemRepository.GetByIdAsNoTrackingAsync(id);
+        ServiceResult<WorkItem> access =
+            AuthorizeRead(workItem, currentUserId);
+
+        if (!access.IsSuccess)
         {
-            WorkItem? workItem =
-                await _workItemRepository.GetByIdAsync(id);
-
-            if (workItem == null)
-            {
-                return ServiceResult.NotFound(NotFoundMessage);
-            }
-
-            if (IsForbidden(workItem, currentUserId))
-            {
-                return ServiceResult.Forbidden(ForbiddenMessage);
-            }
-
-            if (workItem.WorkflowStatus != WorkflowStatus.Submitted)
-            {
-                return ServiceResult.Failure(DeleteStatusMessage);
-            }
-
-            _workItemRepository.Remove(workItem);
-            await _workItemRepository.SaveChangesAsync();
-
-            return ServiceResult.Success();
+            return access;
         }
 
-        private static bool IsForbidden(
-            WorkItem workItem,
-            int? currentUserId)
+        return WorkflowStatusPolicy.CanProjectManagerDelete(
+            workItem!.WorkflowStatus)
+            ? ServiceResult<WorkItem>.Success(workItem)
+            : ServiceResult<WorkItem>.Failure(DeleteStatusMessage);
+    }
+
+    public async Task<ServiceResult> DeleteAsync(
+        int id,
+        int? currentUserId)
+    {
+        WorkItem? workItem = await _workItemRepository.GetByIdAsync(id);
+        if (workItem == null)
         {
-            return !IsValidUserId(currentUserId) ||
-                   workItem.CreatedByUserId !=
-                       currentUserId.GetValueOrDefault();
+            return ServiceResult.NotFound(NotFoundMessage);
         }
 
-        private static bool IsValidUserId(int? currentUserId)
+        if (IsForbidden(workItem, currentUserId))
         {
-            return currentUserId.HasValue && currentUserId.Value > 0;
+            return ServiceResult.Forbidden(ForbiddenMessage);
         }
+
+        if (!WorkflowStatusPolicy.CanProjectManagerDelete(
+                workItem.WorkflowStatus))
+        {
+            return ServiceResult.Failure(DeleteStatusMessage);
+        }
+
+        _workItemRepository.Remove(workItem);
+        await _workItemRepository.SaveChangesAsync();
+        return ServiceResult.Success();
+    }
+
+    private static ServiceResult<WorkItem> AuthorizeRead(
+        WorkItem? workItem,
+        int? currentUserId)
+    {
+        if (workItem == null)
+        {
+            return ServiceResult<WorkItem>.NotFound(NotFoundMessage);
+        }
+
+        return IsForbidden(workItem, currentUserId)
+            ? ServiceResult<WorkItem>.Forbidden(ForbiddenMessage)
+            : ServiceResult<WorkItem>.Success(workItem);
+    }
+
+    private static bool IsForbidden(
+        WorkItem workItem,
+        int? currentUserId)
+    {
+        return !IsValidUserId(currentUserId) ||
+               workItem.CreatedByUserId !=
+                   currentUserId.GetValueOrDefault();
+    }
+
+    private static bool IsValidUserId(int? currentUserId)
+    {
+        return currentUserId.HasValue && currentUserId.Value > 0;
+    }
+
+    private static bool IsValidPriority(RequestPriority priority)
+    {
+        return Enum.IsDefined(typeof(RequestPriority), priority);
     }
 }

@@ -1,13 +1,16 @@
 using FlowDesk.Data;
 using FlowDesk.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace FlowDesk.CharacterizationTests.Infrastructure;
 
@@ -15,9 +18,15 @@ public sealed class FlowDeskWebApplicationFactory
     : WebApplicationFactory<Program>
 {
     private readonly SqliteConnection _connection;
+    private readonly string _environmentName;
+    private readonly IInterceptor? _interceptor;
 
-    public FlowDeskWebApplicationFactory()
+    public FlowDeskWebApplicationFactory(
+        string environmentName = "Testing",
+        IInterceptor? interceptor = null)
     {
+        _environmentName = environmentName;
+        _interceptor = interceptor;
         _connection = new SqliteConnection("Data Source=:memory:");
         _connection.Open();
     }
@@ -27,7 +36,8 @@ public sealed class FlowDeskWebApplicationFactory
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.UseEnvironment("Testing");
+        builder.UseEnvironment(_environmentName);
+        builder.ConfigureLogging(logging => logging.ClearProviders());
 
         builder.ConfigureAppConfiguration((_, configuration) =>
         {
@@ -48,6 +58,9 @@ public sealed class FlowDeskWebApplicationFactory
 
         builder.ConfigureServices(services =>
         {
+            services.AddDataProtection()
+                .UseEphemeralDataProtectionProvider();
+
             services.RemoveAll<AppDbContext>();
             services.RemoveAll<DbContextOptions>();
             services.RemoveAll<DbContextOptions<AppDbContext>>();
@@ -60,7 +73,13 @@ public sealed class FlowDeskWebApplicationFactory
             }
 
             services.AddDbContext<AppDbContext>(options =>
-                options.UseSqlite(_connection));
+            {
+                options.UseSqlite(_connection);
+                if (_interceptor != null)
+                {
+                    options.AddInterceptors(_interceptor);
+                }
+            });
 
             services.RemoveAll<IEmailService>();
             services.AddSingleton<FakeEmailService>();
@@ -113,6 +132,8 @@ public sealed class FlowDeskWebApplicationFactory
             TestDataSeeder.UniqueEmail("default-manager"),
             assignedRole: FlowDesk.Constants.AppRoles.DepartmentManager,
             userId: 9001);
+        await IdentitySeeder.BackfillBusinessCodesAsync(
+            scope.ServiceProvider);
         Email.Clear();
     }
 

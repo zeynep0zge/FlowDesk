@@ -243,16 +243,9 @@
                                     _ => "bg-secondary-subtle text-dark"
                                 };
 
-                                string workflowText = item.WorkflowStatus switch
-                                {
-                                    WorkflowStatus.Submitted =>
-                                        "Yeni Talep",
-
-                                    WorkflowStatus.UnderAnalystReview =>
-                                        "Analist İncelemesinde",
-
-                                    _ => item.WorkflowStatus.ToString()
-                                };
+                                string workflowText =
+                                    WorkflowStatusDescriptions.GetDescription(
+                                        item.WorkflowStatus);
 
                                 string workflowClass = item.WorkflowStatus switch
                                 {

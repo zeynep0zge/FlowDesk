@@ -25,18 +25,24 @@ namespace FlowDesk.Repositories.Interfaces
             GetReturnedRequestsCountAsync(int currentAnalystId);
 
         Task<List<WorkItem>>
-            GetWaitingManagerApprovalAsync(string department);
+            GetWaitingManagerApprovalAsync(
+                string department,
+                bool canAccessAllDepartments);
 
         Task<List<WorkItem>>
-            GetApprovedRequestsAsync(string department);
+            GetApprovedRequestsAsync(
+                string department,
+                bool canAccessAllDepartments);
 
-        Task<WorkItem?> GetByIdInDepartmentAsync(
+        Task<WorkItem?> GetManagerWorkItemByIdAsync(
             int id,
-            string department);
+            string department,
+            bool canAccessAllDepartments);
 
-        Task<WorkItem?> GetByIdInDepartmentAsNoTrackingAsync(
+        Task<WorkItem?> GetManagerWorkItemByIdAsNoTrackingAsync(
             int id,
-            string department);
+            string department,
+            bool canAccessAllDepartments);
 
         Task<List<WorkItem>>
             GetEmployeeAssignedWorkItemsAsync(int employeeId);

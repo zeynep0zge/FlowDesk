@@ -27,7 +27,9 @@ public static class TestDataSeeder
         string? requestedRole = null,
         string? assignedRole = null,
         string? department = null,
-        int? userId = null)
+        int? userId = null,
+        string? businessCode = null,
+        string? fullName = null)
     {
         UserManager<ApplicationUser> userManager =
             services.GetRequiredService<UserManager<ApplicationUser>>();
@@ -37,11 +39,12 @@ public static class TestDataSeeder
             Id = userId.GetValueOrDefault(),
             UserName = email,
             Email = email,
-            FullName = "Characterization Test User",
+            FullName = fullName ?? "Characterization Test User",
             Department = department ?? DefaultDepartment,
             RequestedRole = requestedRole,
             EmailConfirmed = emailConfirmed,
             IsApproved = isApproved,
+            BusinessCode = businessCode,
             CreatedAtUtc = DateTime.UtcNow
         };
 

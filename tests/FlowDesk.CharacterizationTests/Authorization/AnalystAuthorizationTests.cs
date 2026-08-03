@@ -211,7 +211,7 @@ public sealed class AnalystAuthorizationTests : DatabaseTestBase
             ["ReleaseDate"] = "2026-09-20",
             ["BanksoftDeliveryDate"] = "2026-09-10",
             ["ExpectedStatus"] = "Ready",
-            ["CurrentStatus"] = "In review",
+            ["CurrentStatus"] = AnalystCurrentStatusOptions.UnderAnalystReview,
             ["AnalystNote"] = "Authorization test"
         };
     }
@@ -228,7 +228,7 @@ public sealed class AnalystAuthorizationTests : DatabaseTestBase
             ReleaseDate = new DateTime(2026, 9, 20),
             BanksoftDeliveryDate = new DateTime(2026, 9, 10),
             ExpectedStatus = "Ready",
-            CurrentStatus = "In review",
+            CurrentStatus = AnalystCurrentStatusOptions.UnderAnalystReview,
             AnalystNote = "Authorization test"
         };
     }
