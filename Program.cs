@@ -105,6 +105,9 @@ builder.Services.ConfigureApplicationCookie(options =>
 });
 
 builder.Services.AddScoped<IWorkItemRepository, WorkItemRepository>();
+builder.Services.AddScoped<
+    IWorkItemReadRepository,
+    WorkItemReadRepository>();
 
 builder.Services.AddScoped<IIdentifierGenerator, IdentifierGenerator>();
 
@@ -123,6 +126,14 @@ builder.Services.AddScoped<
 builder.Services.AddScoped<
     IManagerAccessScopeResolver,
     ManagerAccessScopeResolver>();
+
+builder.Services.AddScoped<
+    IAuthenticatedActorContextResolver,
+    AuthenticatedActorContextResolver>();
+
+builder.Services.AddScoped<
+    IAuthorizedWorkItemQueryService,
+    AuthorizedWorkItemQueryService>();
 
 builder.Services.AddScoped<IAnalystWorkflowService, AnalystWorkflowService>();
 

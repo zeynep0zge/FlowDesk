@@ -8,720 +8,429 @@ using FlowDesk.ViewModels.Analyst;
 using FlowDesk.ViewModels.DepartmentManager;
 using Microsoft.AspNetCore.Identity;
 
-namespace FlowDesk.Services
+namespace FlowDesk.Services;
+
+public class AnalystWorkflowService : IAnalystWorkflowService
 {
-    public class AnalystWorkflowService : IAnalystWorkflowService
+    private const string InvalidActorMessage =
+        "Gecerli analist kimligi bulunamadi.";
+    private const string NotFoundMessage = "Talep bulunamadı.";
+
+    private readonly IWorkItemRepository _workItemRepository;
+    private readonly UserManager<ApplicationUser> _userManager;
+    private readonly AnalystWorkflowValidator _validator = new();
+
+    public AnalystWorkflowService(
+        IWorkItemRepository workItemRepository,
+        UserManager<ApplicationUser> userManager)
     {
-        private readonly IWorkItemRepository _workItemRepository;
-        private readonly UserManager<ApplicationUser> _userManager;
+        _workItemRepository = workItemRepository;
+        _userManager = userManager;
+    }
 
-        public AnalystWorkflowService(
-            IWorkItemRepository workItemRepository,
-            UserManager<ApplicationUser> userManager)
+    public async Task<ServiceResult<AnalystInboxViewModel>>
+        GetInboxAsync(int? currentAnalystId)
+    {
+        if (!IsValidUserId(currentAnalystId))
         {
-            _workItemRepository = workItemRepository;
-            _userManager = userManager;
+            return ServiceResult<AnalystInboxViewModel>.Forbidden(
+                InvalidActorMessage);
         }
 
-        public async Task<ServiceResult<AnalystInboxViewModel>>
-            GetInboxAsync(int? currentAnalystId)
+        int analystId = currentAnalystId.GetValueOrDefault();
+        List<WorkItem> workItems =
+            await _workItemRepository.GetAnalystInboxAsync(analystId);
+        int returnedCount = await _workItemRepository
+            .GetReturnedRequestsCountAsync(analystId);
+
+        AnalystInboxViewModel viewModel = new()
         {
-            if (!IsValidUserId(currentAnalystId))
-            {
-                return ServiceResult<AnalystInboxViewModel>.Forbidden(
-                    "Gecerli analist kimligi bulunamadi.");
-            }
+            WorkItems = workItems
+                .Select(AnalystWorkflowMapper.ToInboxItem)
+                .ToList(),
+            ReturnedCount = returnedCount
+        };
 
-            List<WorkItem> workItems =
-                await _workItemRepository.GetAnalystInboxAsync(
-                    currentAnalystId.GetValueOrDefault());
+        return ServiceResult<AnalystInboxViewModel>.Success(viewModel);
+    }
 
-            int returnedCount =
-                await _workItemRepository
-                    .GetReturnedRequestsCountAsync(
-                        currentAnalystId.GetValueOrDefault());
-
-            AnalystInboxViewModel viewModel = new()
-            {
-                WorkItems = workItems
-                    .Select(MapToInboxItemViewModel)
-                    .ToList(),
-
-                ReturnedCount = returnedCount
-            };
-
-            return ServiceResult<AnalystInboxViewModel>
-                .Success(viewModel);
-        }
-
-        public async Task<
-            ServiceResult<List<AnalystInboxItemViewModel>>>
-            GetReturnedRequestsAsync(int? currentAnalystId)
+    public async Task<ServiceResult<List<AnalystInboxItemViewModel>>>
+        GetReturnedRequestsAsync(int? currentAnalystId)
+    {
+        if (!IsValidUserId(currentAnalystId))
         {
-            if (!IsValidUserId(currentAnalystId))
-            {
-                return ServiceResult<
-                    List<AnalystInboxItemViewModel>>.Forbidden(
-                        "Gecerli analist kimligi bulunamadi.");
-            }
-
-            List<WorkItem> workItems =
-                await _workItemRepository.GetReturnedRequestsAsync(
-                    currentAnalystId.GetValueOrDefault());
-
-            List<AnalystInboxItemViewModel> viewModels =
-                workItems
-                    .Select(MapToInboxItemViewModel)
-                    .ToList();
-
             return ServiceResult<List<AnalystInboxItemViewModel>>
-                .Success(viewModels);
+                .Forbidden(InvalidActorMessage);
         }
 
-        public async Task<ServiceResult<AnalystReviewViewModel>>
-            GetReviewAsync(int id, int? currentAnalystId)
+        List<WorkItem> workItems = await _workItemRepository
+            .GetReturnedRequestsAsync(
+                currentAnalystId.GetValueOrDefault());
+        List<AnalystInboxItemViewModel> viewModels = workItems
+            .Select(AnalystWorkflowMapper.ToInboxItem)
+            .ToList();
+
+        return ServiceResult<List<AnalystInboxItemViewModel>>
+            .Success(viewModels);
+    }
+
+    public async Task<ServiceResult<AnalystReviewViewModel>>
+        GetReviewAsync(int id, int? currentAnalystId)
+    {
+        if (!IsValidUserId(currentAnalystId))
         {
-            if (!IsValidUserId(currentAnalystId))
-            {
-                return ServiceResult<AnalystReviewViewModel>.Forbidden(
-                    "Gecerli analist kimligi bulunamadi.");
-            }
-
-            if (id <= 0)
-            {
-                return ServiceResult<AnalystReviewViewModel>
-                    .Failure("Geçersiz talep ID.");
-            }
-
-            WorkItem? workItem =
-                await _workItemRepository
-                    .GetByIdAsNoTrackingAsync(id);
-
-            if (workItem == null)
-            {
-                return ServiceResult<AnalystReviewViewModel>
-                    .NotFound("Talep bulunamadı.");
-            }
-
-            if (workItem.AnalystId !=
-                currentAnalystId.GetValueOrDefault())
-            {
-                return ServiceResult<AnalystReviewViewModel>.Forbidden(
-                    "Bu talebe erisim yetkiniz bulunmuyor.");
-            }
-
-            if (!WorkflowStatusPolicy.CanAnalystSaveAnalysis(
-                    workItem.WorkflowStatus))
-            {
-                return ServiceResult<AnalystReviewViewModel>
-                    .Failure(
-                        "Bu talep analist tarafından " +
-                        "düzenlenebilecek aşamada değildir."
-                    );
-            }
-
-            AnalystReviewViewModel viewModel =
-                await MapToReviewViewModelAsync(workItem);
-
-            return ServiceResult<AnalystReviewViewModel>
-                .Success(viewModel);
+            return ServiceResult<AnalystReviewViewModel>.Forbidden(
+                InvalidActorMessage);
         }
 
-        public async Task<ServiceResult> StartReviewAsync(
-            int id,
-            int? currentAnalystId)
+        string? idError = _validator.ValidateWorkItemId(id);
+        if (idError != null)
         {
-            if (!IsValidUserId(currentAnalystId))
-            {
-                return ServiceResult.Forbidden(
-                    "Gecerli analist kimligi bulunamadi.");
-            }
-
-            if (id <= 0)
-            {
-                return ServiceResult.Failure(
-                    "Geçersiz talep ID."
-                );
-            }
-
-            WorkItem? workItem =
-                await _workItemRepository.GetByIdAsync(id);
-
-            if (workItem == null)
-            {
-                return ServiceResult.NotFound(
-                    "Talep bulunamadı."
-                );
-            }
-
-            if (workItem.WorkflowStatus != WorkflowStatus.Submitted &&
-                workItem.AnalystId !=
-                    currentAnalystId.GetValueOrDefault())
-            {
-                return ServiceResult.Forbidden(
-                    "Bu talebe erisim yetkiniz bulunmuyor.");
-            }
-
-            if (workItem.WorkflowStatus == WorkflowStatus.Submitted &&
-                workItem.AnalystId.HasValue &&
-                workItem.AnalystId !=
-                    currentAnalystId.GetValueOrDefault())
-            {
-                return ServiceResult.Forbidden(
-                    "Bu talep baska bir analist tarafindan sahiplenilmis.");
-            }
-
-            if (!WorkflowStatusPolicy.CanAnalystStartReview(
-                    workItem.WorkflowStatus))
-            {
-                return ServiceResult.Failure(
-                    "Bu talep analist tarafından " +
-                    "incelenebilecek aşamada değildir."
-                );
-            }
-
-            if (workItem.WorkflowStatus ==
-                WorkflowStatus.Submitted)
-            {
-                workItem.AnalystId =
-                    currentAnalystId.GetValueOrDefault();
-                workItem.WorkflowStatus =
-                    WorkflowStatus.UnderAnalystReview;
-
-                workItem.CurrentStatus =
-                    WorkflowStatusDescriptions.GetDescription(
-                        WorkflowStatus.UnderAnalystReview);
-
-                workItem.UpdatedAt = DateTime.UtcNow;
-
-                await _workItemRepository.SaveChangesAsync();
-            }
-
-            return ServiceResult.Success();
+            return ServiceResult<AnalystReviewViewModel>.Failure(idError);
         }
 
-        public async Task<ServiceResult<AnalystReviewViewModel>>
-            SaveAnalysisAsync(
-                SaveAnalysisDto dto,
-                int? currentAnalystId)
+        WorkItem? workItem = await _workItemRepository
+            .GetByIdAsNoTrackingAsync(id);
+        if (workItem == null)
         {
-            if (!IsValidUserId(currentAnalystId))
-            {
-                return ServiceResult<AnalystReviewViewModel>.Forbidden(
-                    "Gecerli analist kimligi bulunamadi.");
-            }
-
-            if (dto.WorkItemId <= 0)
-            {
-                return ServiceResult<AnalystReviewViewModel>
-                    .Failure("Geçersiz talep ID.");
-            }
-
-            WorkItem? workItem =
-                await _workItemRepository
-                    .GetByIdAsync(dto.WorkItemId);
-
-            if (workItem == null)
-            {
-                return ServiceResult<AnalystReviewViewModel>
-                    .NotFound("Talep bulunamadı.");
-            }
-
-            if (workItem.AnalystId !=
-                currentAnalystId.GetValueOrDefault())
-            {
-                return ServiceResult<AnalystReviewViewModel>.Forbidden(
-                    "Bu talebi degistirme yetkiniz bulunmuyor.");
-            }
-
-            if (!WorkflowStatusPolicy.CanAnalystSaveAnalysis(
-                    workItem.WorkflowStatus))
-            {
-                return ServiceResult<AnalystReviewViewModel>
-                    .Failure(
-                        "Bu talep analist tarafından " +
-                        "düzenlenebilecek aşamada değildir."
-                    );
-            }
-
-            string? expectedStatus =
-                NormalizeNullableText(dto.ExpectedStatus);
-
-            string? currentStatus =
-                NormalizeNullableText(dto.CurrentStatus);
-
-            string? analystNote =
-                NormalizeNullableText(dto.AnalystNote);
-
-            List<string> validationErrors = new();
-
-            string? expectedStatusError =
-                ValidateExpectedStatus(expectedStatus);
-            if (expectedStatusError != null)
-            {
-                validationErrors.Add(expectedStatusError);
-            }
-
-            if (currentStatus != null &&
-                currentStatus.Length >
-                    AnalystCurrentStatusOptions.MaximumLength)
-            {
-                validationErrors.Add(
-                    "Mevcut statü en fazla " +
-                    $"{AnalystCurrentStatusOptions.MaximumLength} " +
-                    "karakter olabilir."
-                );
-            }
-            else if (currentStatus != null &&
-                     !AnalystCurrentStatusOptions.Contains(currentStatus))
-            {
-                validationErrors.Add(
-                    "Geçerli bir mevcut statü seçiniz."
-                );
-            }
-
-            if (dto.AnalystId.HasValue &&
-                dto.AnalystId.Value <= 0)
-            {
-                validationErrors.Add(
-                    "Analist ID 0'dan büyük olmalıdır."
-                );
-            }
-
-            if (dto.DeveloperId.HasValue &&
-                dto.DeveloperId.Value <= 0)
-            {
-                validationErrors.Add(
-                    "Yazılımcı ID 0'dan büyük olmalıdır."
-                );
-            }
-
-            if (dto.ReleaseDate.HasValue &&
-                dto.BanksoftDeliveryDate.HasValue &&
-                dto.BanksoftDeliveryDate.Value.Date >
-                dto.ReleaseDate.Value.Date)
-            {
-                validationErrors.Add(
-                    "Banksoft teslim tarihi, " +
-                    "sürüm tarihinden sonra olamaz."
-                );
-            }
-
-            if (analystNote != null &&
-                analystNote.Length > 1000)
-            {
-                validationErrors.Add(
-                    "Analist notu en fazla " +
-                    "1000 karakter olabilir."
-                );
-            }
-
-            if (validationErrors.Count > 0)
-            {
-                return ServiceResult<AnalystReviewViewModel>
-                    .Failure(
-                        string.Join(" ", validationErrors)
-                    );
-            }
-
-            ServiceResult developerResult =
-                await ValidateDeveloperAsync(
-                    dto.DeveloperId,
-                    workItem.Department);
-
-            if (!developerResult.IsSuccess)
-            {
-                return ServiceResult<AnalystReviewViewModel>.Failure(
-                    developerResult.ErrorMessage!);
-            }
-
-            workItem.AnalystId =
-                currentAnalystId.GetValueOrDefault();
-            workItem.DeveloperId = dto.DeveloperId;
-            workItem.ReleaseDate = dto.ReleaseDate;
-
-            workItem.BanksoftDeliveryDate =
-                dto.BanksoftDeliveryDate;
-
-            workItem.ExpectedStatus = expectedStatus;
-            workItem.AnalystNote = analystNote;
-
-            workItem.CurrentStatus =
-                currentStatus ?? WorkflowStatusDescriptions.GetDescription(
-                    WorkflowStatus.UnderAnalystReview);
-
-            workItem.WorkflowStatus =
-                WorkflowStatus.UnderAnalystReview;
-
-            workItem.UpdatedAt = DateTime.UtcNow;
-
-            await _workItemRepository.SaveChangesAsync();
-
-            AnalystReviewViewModel viewModel =
-                await MapToReviewViewModelAsync(workItem);
-
-            return ServiceResult<AnalystReviewViewModel>
-                .Success(viewModel);
+            return ServiceResult<AnalystReviewViewModel>.NotFound(
+                NotFoundMessage);
         }
 
-        public async Task<ServiceResult>
-            SubmitForApprovalAsync(
-                SubmitForApprovalDto dto,
-                int? currentAnalystId)
+        if (workItem.AnalystId != currentAnalystId.GetValueOrDefault())
         {
-            if (!IsValidUserId(currentAnalystId))
-            {
-                return ServiceResult.Forbidden(
-                    "Gecerli analist kimligi bulunamadi.");
-            }
+            return ServiceResult<AnalystReviewViewModel>.Forbidden(
+                "Bu talebe erisim yetkiniz bulunmuyor.");
+        }
 
-            dto.AnalystId = currentAnalystId.GetValueOrDefault();
+        if (!WorkflowStatusPolicy.CanAnalystSaveAnalysis(
+                workItem.WorkflowStatus))
+        {
+            return ServiceResult<AnalystReviewViewModel>.Failure(
+                "Bu talep analist tarafından düzenlenebilecek aşamada " +
+                "değildir.");
+        }
 
-            if (dto.WorkItemId <= 0)
-            {
-                return ServiceResult.Failure(
-                    "Geçersiz talep ID."
-                );
-            }
+        return ServiceResult<AnalystReviewViewModel>.Success(
+            await MapToReviewViewModelAsync(workItem));
+    }
 
-            WorkItem? workItem =
-                await _workItemRepository
-                    .GetByIdAsync(dto.WorkItemId);
+    public async Task<ServiceResult> StartReviewAsync(
+        int id,
+        int? currentAnalystId)
+    {
+        if (!IsValidUserId(currentAnalystId))
+        {
+            return ServiceResult.Forbidden(InvalidActorMessage);
+        }
 
-            if (workItem == null)
-            {
-                return ServiceResult.NotFound(
-                    "Talep bulunamadı."
-                );
-            }
+        string? idError = _validator.ValidateWorkItemId(id);
+        if (idError != null)
+        {
+            return ServiceResult.Failure(idError);
+        }
 
-            if (workItem.AnalystId !=
-                currentAnalystId.GetValueOrDefault())
-            {
-                return ServiceResult.Forbidden(
-                    "Bu talebi gonderme yetkiniz bulunmuyor.");
-            }
+        int analystId = currentAnalystId.GetValueOrDefault();
+        WorkItem? workItem =
+            await _workItemRepository.GetByIdAsync(id);
+        if (workItem == null)
+        {
+            return ServiceResult.NotFound(NotFoundMessage);
+        }
 
-            if (workItem.WorkflowStatus ==
-                WorkflowStatus.WaitingManagerApproval)
-            {
-                return ServiceResult.Failure(
-                    "Bu talep zaten departman yöneticisi " +
-                    "onayına gönderilmiş."
-                );
-            }
+        if (workItem.WorkflowStatus != WorkflowStatus.Submitted &&
+            workItem.AnalystId != analystId)
+        {
+            return ServiceResult.Forbidden(
+                "Bu talebe erisim yetkiniz bulunmuyor.");
+        }
 
-            if (!WorkflowStatusPolicy.CanAnalystSubmitForManagerApproval(
-                    workItem.WorkflowStatus))
-            {
-                return ServiceResult.Failure(
-                    "Bu talep yönetici onayına " +
-                    "gönderilebilecek aşamada değildir."
-                );
-            }
+        if (workItem.WorkflowStatus == WorkflowStatus.Submitted &&
+            workItem.AnalystId.HasValue &&
+            workItem.AnalystId != analystId)
+        {
+            return ServiceResult.Forbidden(
+                "Bu talep baska bir analist tarafindan sahiplenilmis.");
+        }
 
-            string? expectedStatus =
-                NormalizeNullableText(dto.ExpectedStatus);
+        if (!WorkflowStatusPolicy.CanAnalystStartReview(
+                workItem.WorkflowStatus))
+        {
+            return ServiceResult.Failure(
+                "Bu talep analist tarafından incelenebilecek aşamada " +
+                "değildir.");
+        }
 
-            string? analystNote =
-                NormalizeNullableText(dto.AnalystNote);
-
-            List<string> missingFields = new();
-            List<string> invalidFields = new();
-
-            string? expectedStatusError =
-                ValidateExpectedStatus(expectedStatus);
-            if (expectedStatusError != null)
-            {
-                return ServiceResult.Failure(expectedStatusError);
-            }
-
-            if (!dto.AnalystId.HasValue)
-            {
-                missingFields.Add("analist");
-            }
-            else if (dto.AnalystId.Value <= 0)
-            {
-                invalidFields.Add("analist ID");
-            }
-
-            if (!dto.DeveloperId.HasValue)
-            {
-                missingFields.Add("yazılımcı");
-            }
-            else if (dto.DeveloperId.Value <= 0)
-            {
-                invalidFields.Add("yazılımcı ID");
-            }
-
-            if (!dto.ReleaseDate.HasValue)
-            {
-                missingFields.Add("sürüm tarihi");
-            }
-
-            if (!dto.BanksoftDeliveryDate.HasValue)
-            {
-                missingFields.Add(
-                    "Banksoft teslim tarihi"
-                );
-            }
-
-            if (expectedStatus == null)
-            {
-                missingFields.Add("beklenen statü");
-            }
-
-            if (missingFields.Count > 0)
-            {
-                return ServiceResult.Failure(
-                    "Yönetici onayına göndermeden önce " +
-                    "şu alanları doldurun: " +
-                    string.Join(", ", missingFields) +
-                    "."
-                );
-            }
-
-            if (invalidFields.Count > 0)
-            {
-                return ServiceResult.Failure(
-                    "Şu alanlar 0'dan büyük olmalıdır: " +
-                    string.Join(", ", invalidFields) +
-                    "."
-                );
-            }
-
-            if (analystNote != null &&
-                analystNote.Length > 1000)
-            {
-                return ServiceResult.Failure(
-                    "Analist notu en fazla " +
-                    "1000 karakter olabilir."
-                );
-            }
-
-            DateTime releaseDate =
-                dto.ReleaseDate.GetValueOrDefault();
-
-            DateTime banksoftDeliveryDate =
-                dto.BanksoftDeliveryDate
-                    .GetValueOrDefault();
-
-            if (banksoftDeliveryDate.Date >
-                releaseDate.Date)
-            {
-                return ServiceResult.Failure(
-                    "Banksoft teslim tarihi, " +
-                    "sürüm tarihinden sonra olamaz."
-                );
-            }
-
-            ServiceResult developerResult =
-                await ValidateDeveloperAsync(
-                    dto.DeveloperId,
-                    workItem.Department);
-
-            if (!developerResult.IsSuccess)
-            {
-                return developerResult;
-            }
-
-            workItem.AnalystId =
-                currentAnalystId.GetValueOrDefault();
-            workItem.DeveloperId = dto.DeveloperId;
-            workItem.ReleaseDate = dto.ReleaseDate;
-
-            workItem.BanksoftDeliveryDate =
-                dto.BanksoftDeliveryDate;
-
-            workItem.ExpectedStatus = expectedStatus;
-            workItem.AnalystNote = analystNote;
-
-            workItem.WorkflowStatus =
-                WorkflowStatus.WaitingManagerApproval;
-
+        if (workItem.WorkflowStatus == WorkflowStatus.Submitted)
+        {
+            workItem.AnalystId = analystId;
+            workItem.WorkflowStatus = WorkflowStatus.UnderAnalystReview;
             workItem.CurrentStatus =
                 WorkflowStatusDescriptions.GetDescription(
-                    WorkflowStatus.WaitingManagerApproval);
-
+                    WorkflowStatus.UnderAnalystReview);
             workItem.UpdatedAt = DateTime.UtcNow;
-
             await _workItemRepository.SaveChangesAsync();
+        }
 
+        return ServiceResult.Success();
+    }
+
+    public async Task<ServiceResult<AnalystReviewViewModel>>
+        SaveAnalysisAsync(
+            SaveAnalysisDto dto,
+            int? currentAnalystId)
+    {
+        if (!IsValidUserId(currentAnalystId))
+        {
+            return ServiceResult<AnalystReviewViewModel>.Forbidden(
+                InvalidActorMessage);
+        }
+
+        string? idError = _validator.ValidateWorkItemId(dto.WorkItemId);
+        if (idError != null)
+        {
+            return ServiceResult<AnalystReviewViewModel>.Failure(idError);
+        }
+
+        int analystId = currentAnalystId.GetValueOrDefault();
+        WorkItem? workItem = await _workItemRepository
+            .GetByIdAsync(dto.WorkItemId);
+        if (workItem == null)
+        {
+            return ServiceResult<AnalystReviewViewModel>.NotFound(
+                NotFoundMessage);
+        }
+
+        if (workItem.AnalystId != analystId)
+        {
+            return ServiceResult<AnalystReviewViewModel>.Forbidden(
+                "Bu talebi degistirme yetkiniz bulunmuyor.");
+        }
+
+        if (!WorkflowStatusPolicy.CanAnalystSaveAnalysis(
+                workItem.WorkflowStatus))
+        {
+            return ServiceResult<AnalystReviewViewModel>.Failure(
+                "Bu talep analist tarafından düzenlenebilecek aşamada " +
+                "değildir.");
+        }
+
+        AnalystWorkflowValidationResult validation =
+            _validator.ValidateSave(dto);
+        if (!validation.IsValid)
+        {
+            return ServiceResult<AnalystReviewViewModel>.Failure(
+                validation.ErrorMessage!);
+        }
+
+        ServiceResult developerResult = await ValidateDeveloperAsync(
+            dto.DeveloperId,
+            workItem.Department);
+        if (!developerResult.IsSuccess)
+        {
+            return ServiceResult<AnalystReviewViewModel>.Failure(
+                developerResult.ErrorMessage!);
+        }
+
+        ApplySavedAnalysis(
+            workItem,
+            dto,
+            validation,
+            analystId);
+        await _workItemRepository.SaveChangesAsync();
+
+        return ServiceResult<AnalystReviewViewModel>.Success(
+            await MapToReviewViewModelAsync(workItem));
+    }
+
+    public async Task<ServiceResult> SubmitForApprovalAsync(
+        SubmitForApprovalDto dto,
+        int? currentAnalystId)
+    {
+        if (!IsValidUserId(currentAnalystId))
+        {
+            return ServiceResult.Forbidden(InvalidActorMessage);
+        }
+
+        int analystId = currentAnalystId.GetValueOrDefault();
+        dto.AnalystId = analystId;
+
+        string? idError = _validator.ValidateWorkItemId(dto.WorkItemId);
+        if (idError != null)
+        {
+            return ServiceResult.Failure(idError);
+        }
+
+        WorkItem? workItem = await _workItemRepository
+            .GetByIdAsync(dto.WorkItemId);
+        if (workItem == null)
+        {
+            return ServiceResult.NotFound(NotFoundMessage);
+        }
+
+        if (workItem.AnalystId != analystId)
+        {
+            return ServiceResult.Forbidden(
+                "Bu talebi gonderme yetkiniz bulunmuyor.");
+        }
+
+        if (workItem.WorkflowStatus ==
+            WorkflowStatus.WaitingManagerApproval)
+        {
+            return ServiceResult.Failure(
+                "Bu talep zaten departman yöneticisi onayına " +
+                "gönderilmiş.");
+        }
+
+        if (!WorkflowStatusPolicy.CanAnalystSubmitForManagerApproval(
+                workItem.WorkflowStatus))
+        {
+            return ServiceResult.Failure(
+                "Bu talep yönetici onayına gönderilebilecek aşamada " +
+                "değildir.");
+        }
+
+        AnalystWorkflowValidationResult validation =
+            _validator.ValidateSubmit(dto);
+        if (!validation.IsValid)
+        {
+            return ServiceResult.Failure(validation.ErrorMessage!);
+        }
+
+        ServiceResult developerResult = await ValidateDeveloperAsync(
+            dto.DeveloperId,
+            workItem.Department);
+        if (!developerResult.IsSuccess)
+        {
+            return developerResult;
+        }
+
+        ApplySubmittedAnalysis(
+            workItem,
+            dto,
+            validation,
+            analystId);
+        await _workItemRepository.SaveChangesAsync();
+
+        return ServiceResult.Success();
+    }
+
+    private async Task<ServiceResult> ValidateDeveloperAsync(
+        int? developerId,
+        string workItemDepartment)
+    {
+        if (!developerId.HasValue)
+        {
             return ServiceResult.Success();
         }
 
-        private async Task<ServiceResult> ValidateDeveloperAsync(
-            int? developerId,
-            string workItemDepartment)
+        ApplicationUser? developer = await _userManager.FindByIdAsync(
+            developerId.Value.ToString());
+
+        if (developer == null ||
+            !developer.EmailConfirmed ||
+            !developer.IsApproved ||
+            string.IsNullOrWhiteSpace(developer.BusinessCode) ||
+            !await _userManager.IsInRoleAsync(developer, AppRoles.Employee) ||
+            !string.Equals(
+                developer.Department,
+                workItemDepartment,
+                StringComparison.Ordinal))
         {
-            if (!developerId.HasValue)
-            {
-                return ServiceResult.Success();
-            }
+            return ServiceResult.Failure(
+                "Secilen yazilimci bu talep icin yetkili degil.");
+        }
 
-            ApplicationUser? developer = await _userManager.FindByIdAsync(
-                developerId.Value.ToString());
+        return ServiceResult.Success();
+    }
 
-            if (developer == null ||
-                !developer.EmailConfirmed ||
-                !developer.IsApproved ||
-                string.IsNullOrWhiteSpace(developer.BusinessCode) ||
-                !await _userManager.IsInRoleAsync(
-                    developer,
-                    AppRoles.Employee) ||
-                !string.Equals(
-                    developer.Department,
-                    workItemDepartment,
+    private static void ApplySavedAnalysis(
+        WorkItem workItem,
+        SaveAnalysisDto dto,
+        AnalystWorkflowValidationResult validation,
+        int analystId)
+    {
+        workItem.AnalystId = analystId;
+        workItem.DeveloperId = dto.DeveloperId;
+        workItem.ReleaseDate = dto.ReleaseDate;
+        workItem.BanksoftDeliveryDate = dto.BanksoftDeliveryDate;
+        workItem.ExpectedStatus = validation.ExpectedStatus;
+        workItem.AnalystNote = validation.AnalystNote;
+        workItem.CurrentStatus = validation.CurrentStatus ??
+            WorkflowStatusDescriptions.GetDescription(
+                WorkflowStatus.UnderAnalystReview);
+        workItem.WorkflowStatus = WorkflowStatus.UnderAnalystReview;
+        workItem.UpdatedAt = DateTime.UtcNow;
+    }
+
+    private static void ApplySubmittedAnalysis(
+        WorkItem workItem,
+        SubmitForApprovalDto dto,
+        AnalystWorkflowValidationResult validation,
+        int analystId)
+    {
+        workItem.AnalystId = analystId;
+        workItem.DeveloperId = dto.DeveloperId;
+        workItem.ReleaseDate = dto.ReleaseDate;
+        workItem.BanksoftDeliveryDate = dto.BanksoftDeliveryDate;
+        workItem.ExpectedStatus = validation.ExpectedStatus;
+        workItem.AnalystNote = validation.AnalystNote;
+        workItem.WorkflowStatus = WorkflowStatus.WaitingManagerApproval;
+        workItem.CurrentStatus =
+            WorkflowStatusDescriptions.GetDescription(
+                WorkflowStatus.WaitingManagerApproval);
+        workItem.UpdatedAt = DateTime.UtcNow;
+    }
+
+    private async Task<AnalystReviewViewModel>
+        MapToReviewViewModelAsync(WorkItem workItem)
+    {
+        AnalystReviewViewModel viewModel =
+            AnalystWorkflowMapper.ToReview(workItem);
+
+        ApplicationUser? analyst = workItem.AnalystId.HasValue
+            ? await _userManager.FindByIdAsync(
+                workItem.AnalystId.Value.ToString())
+            : null;
+        viewModel.AnalystDisplayName = GetUserDisplayName(analyst);
+
+        IList<ApplicationUser> employees =
+            await _userManager.GetUsersInRoleAsync(AppRoles.Employee);
+        viewModel.DeveloperOptions = employees
+            .Where(user =>
+                user.EmailConfirmed &&
+                user.IsApproved &&
+                !string.IsNullOrWhiteSpace(user.BusinessCode) &&
+                string.Equals(
+                    user.Department,
+                    workItem.Department,
                     StringComparison.Ordinal))
+            .OrderBy(user => user.FullName)
+            .ThenBy(user => user.BusinessCode)
+            .Select(user => new UserSelectionOptionViewModel
             {
-                return ServiceResult.Failure(
-                    "Secilen yazilimci bu talep icin yetkili degil.");
-            }
+                Id = user.Id,
+                DisplayText = GetUserDisplayName(user)
+            })
+            .ToList();
 
-            return ServiceResult.Success();
-        }
+        return viewModel;
+    }
 
-        private static bool IsValidUserId(int? userId)
+    private static string GetUserDisplayName(ApplicationUser? user)
+    {
+        if (user == null)
         {
-            return userId.HasValue && userId.Value > 0;
+            return string.Empty;
         }
 
+        return string.IsNullOrWhiteSpace(user.BusinessCode)
+            ? user.FullName
+            : $"{user.FullName} \u2014 {user.BusinessCode}";
+    }
 
-        private static string? NormalizeNullableText(
-            string? value)
-        {
-            return string.IsNullOrWhiteSpace(value)
-                ? null
-                : value.Trim();
-        }
-
-        private static string? ValidateExpectedStatus(
-            string? expectedStatus)
-        {
-            return expectedStatus?.Length > 100
-                ? "Beklenen statü en fazla 100 karakter olabilir."
-                : null;
-        }
-
-        private static AnalystInboxItemViewModel
-            MapToInboxItemViewModel(WorkItem workItem)
-        {
-            return new AnalystInboxItemViewModel
-            {
-                Id = workItem.Id,
-
-                RequestNumber =
-                    workItem.RequestNumber,
-
-                RequestDescription =
-                    workItem.RequestDescription,
-
-                Department =
-                    workItem.Department,
-
-                Priority =
-                    workItem.Priority,
-
-                WorkflowStatus =
-                    workItem.WorkflowStatus,
-
-                CurrentStatus =
-                    workItem.CurrentStatus,
-
-                ManagerNote =
-                    workItem.ManagerNote,
-
-                CreatedAt =
-                    workItem.CreatedAt,
-
-                UpdatedAt =
-                    workItem.UpdatedAt
-            };
-        }
-
-        private async Task<AnalystReviewViewModel>
-            MapToReviewViewModelAsync(WorkItem workItem)
-        {
-            ApplicationUser? analyst = workItem.AnalystId.HasValue
-                ? await _userManager.FindByIdAsync(
-                    workItem.AnalystId.Value.ToString())
-                : null;
-
-            IList<ApplicationUser> employees =
-                await _userManager.GetUsersInRoleAsync(AppRoles.Employee);
-
-            List<UserSelectionOptionViewModel> developerOptions = employees
-                .Where(user =>
-                    user.EmailConfirmed &&
-                    user.IsApproved &&
-                    !string.IsNullOrWhiteSpace(user.BusinessCode) &&
-                    string.Equals(
-                        user.Department,
-                        workItem.Department,
-                        StringComparison.Ordinal))
-                .OrderBy(user => user.FullName)
-                .ThenBy(user => user.BusinessCode)
-                .Select(user => new UserSelectionOptionViewModel
-                {
-                    Id = user.Id,
-                    DisplayText = $"{user.FullName} \u2014 {user.BusinessCode}"
-                })
-                .ToList();
-
-            return new AnalystReviewViewModel
-            {
-                Id = workItem.Id,
-
-                RequestNumber =
-                    workItem.RequestNumber,
-
-                RequestDescription =
-                    workItem.RequestDescription,
-
-                Department =
-                    workItem.Department,
-
-                Priority =
-                    workItem.Priority,
-
-                WorkflowStatus =
-                    workItem.WorkflowStatus,
-
-                CreatedAt =
-                    workItem.CreatedAt,
-
-                AnalystId =
-                    workItem.AnalystId,
-
-                AnalystDisplayName = analyst == null
-                    ? string.Empty
-                    : string.IsNullOrWhiteSpace(analyst.BusinessCode)
-                        ? analyst.FullName
-                        : $"{analyst.FullName} \u2014 {analyst.BusinessCode}",
-
-                DeveloperId =
-                    workItem.DeveloperId,
-
-                DeveloperOptions = developerOptions,
-
-                ReleaseDate =
-                    workItem.ReleaseDate,
-
-                BanksoftDeliveryDate =
-                    workItem.BanksoftDeliveryDate,
-
-                ExpectedStatus =
-                    workItem.ExpectedStatus,
-
-                CurrentStatus =
-                    workItem.CurrentStatus,
-
-                AnalystNote =
-                    workItem.AnalystNote,
-
-                ManagerNote =
-                    workItem.ManagerNote
-            };
-        }
+    private static bool IsValidUserId(int? userId)
+    {
+        return userId.HasValue && userId.Value > 0;
     }
 }
