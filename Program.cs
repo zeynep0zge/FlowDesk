@@ -177,6 +177,13 @@ builder.Services.AddHttpClient<
         httpClient.Timeout = Timeout.InfiniteTimeSpan;
     });
 
+builder.Services.AddHttpClient<
+    IUnresolvedTermResearchService,
+    GeminiUnresolvedTermResearchService>(httpClient =>
+    {
+        httpClient.Timeout = Timeout.InfiniteTimeSpan;
+    });
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())

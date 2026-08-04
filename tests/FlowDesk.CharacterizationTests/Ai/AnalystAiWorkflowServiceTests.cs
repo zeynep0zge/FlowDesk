@@ -25,14 +25,145 @@ public sealed class AnalystAiWorkflowServiceTests
             NoTrackingDraft = CreateDraft()
         };
         var rewriteService = new StubAnalystRequestRewriteService();
-        var service = CreateService(repository, rewriteService: rewriteService);
+        var researchService = new StubUnresolvedTermResearchService();
+        var service = CreateService(
+            repository,
+            rewriteService: rewriteService,
+            researchService: researchService);
 
         ServiceResult<AnalystAiDraftResult> result =
             await service.RewriteWorkItemAsync(42, CreateAnalyst());
 
         Assert.True(result.IsSuccess);
         Assert.Equal(0, rewriteService.CallCount);
+        Assert.Equal(0, researchService.CallCount);
         Assert.Equal(1, repository.NoTrackingReadCallCount);
+    }
+
+    [Fact]
+    public async Task RewriteWorkItemAsync_NoUnresolvedTerms_DoesNotResearch()
+    {
+        var repository = new StubDraftRepository();
+        var rewriteService = new StubAnalystRequestRewriteService
+        {
+            Result = ServiceResult<AnalystRequestRewriteResult>.Success(
+                CreateRewriteResult("Gemini düzenlemesi", []))
+        };
+        var researchService = new StubUnresolvedTermResearchService();
+        var service = CreateService(
+            repository,
+            rewriteService: rewriteService,
+            researchService: researchService);
+
+        ServiceResult<AnalystAiDraftResult> result =
+            await service.RewriteWorkItemAsync(42, CreateAnalyst());
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(0, researchService.CallCount);
+    }
+
+    [Fact]
+    public async Task RewriteWorkItemAsync_ResolvedTerm_MovesToAbbreviations()
+    {
+        var repository = new StubDraftRepository();
+        var rewriteService = new StubAnalystRequestRewriteService
+        {
+            Result = ServiceResult<AnalystRequestRewriteResult>.Success(
+                CreateRewriteResult("Gemini düzenlemesi", ["BKM"]))
+        };
+        var researchService = new StubUnresolvedTermResearchService
+        {
+            Result = ServiceResult<UnresolvedTermResearchResult>.Success(
+                new UnresolvedTermResearchResult
+                {
+                    Terms =
+                    [
+                        new ResearchedTerm
+                        {
+                            Term = "BKM",
+                            IsResolved = true,
+                            ExpandedForm = "Bankalararası Kart Merkezi",
+                            Explanation = "Türkiye'deki kartlı ödeme kuruluşu."
+                        }
+                    ]
+                })
+        };
+        var service = CreateService(
+            repository,
+            rewriteService: rewriteService,
+            researchService: researchService);
+
+        ServiceResult<AnalystAiDraftResult> result =
+            await service.RewriteWorkItemAsync(42, CreateAnalyst());
+
+        Assert.True(result.IsSuccess);
+        Assert.Contains(
+            result.Data!.Abbreviations,
+            item => item.Abbreviation == "BKM" &&
+                item.ExpandedForm == "Bankalararası Kart Merkezi");
+        Assert.DoesNotContain("BKM", result.Data.UnresolvedTerms);
+        Assert.Equal("BKM", Assert.Single(researchService.Terms!));
+    }
+
+    [Fact]
+    public async Task RewriteWorkItemAsync_UnresolvedResearchTerm_RemainsUnresolved()
+    {
+        var researchService = new StubUnresolvedTermResearchService
+        {
+            Result = ServiceResult<UnresolvedTermResearchResult>.Success(
+                new UnresolvedTermResearchResult
+                {
+                    Terms =
+                    [
+                        new ResearchedTerm
+                        {
+                            Term = "Kurum içi terim",
+                            IsResolved = false
+                        }
+                    ]
+                })
+        };
+        var service = CreateService(
+            new StubDraftRepository(),
+            rewriteService: new StubAnalystRequestRewriteService
+            {
+                Result = ServiceResult<AnalystRequestRewriteResult>.Success(
+                    CreateRewriteResult("Gemini düzenlemesi"))
+            },
+            researchService: researchService);
+
+        ServiceResult<AnalystAiDraftResult> result =
+            await service.RewriteWorkItemAsync(42, CreateAnalyst());
+
+        Assert.True(result.IsSuccess);
+        Assert.Contains("Kurum içi terim", result.Data!.UnresolvedTerms);
+    }
+
+    [Fact]
+    public async Task RewriteWorkItemAsync_ResearchFailure_SavesRewriteDraft()
+    {
+        var repository = new StubDraftRepository();
+        var researchService = new StubUnresolvedTermResearchService
+        {
+            Result = ServiceResult<UnresolvedTermResearchResult>.Failure(
+                "Araştırma başarısız.")
+        };
+        var service = CreateService(
+            repository,
+            rewriteService: new StubAnalystRequestRewriteService
+            {
+                Result = ServiceResult<AnalystRequestRewriteResult>.Success(
+                    CreateRewriteResult("Kaydedilecek taslak"))
+            },
+            researchService: researchService);
+
+        ServiceResult<AnalystAiDraftResult> result =
+            await service.RewriteWorkItemAsync(42, CreateAnalyst());
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Kaydedilecek taslak", repository.AddedDraft?.GeneratedRequest);
+        Assert.Contains("Kurum içi terim", result.Data!.UnresolvedTerms);
+        Assert.Equal(1, repository.SaveCallCount);
     }
 
     [Fact]
@@ -336,7 +467,8 @@ public sealed class AnalystAiWorkflowServiceTests
     private static AnalystAiWorkflowService CreateService(
         StubDraftRepository repository,
         StubAuthorizedWorkItemQueryService? queryService = null,
-        StubAnalystRequestRewriteService? rewriteService = null)
+        StubAnalystRequestRewriteService? rewriteService = null,
+        StubUnresolvedTermResearchService? researchService = null)
     {
         return new AnalystAiWorkflowService(
             queryService ?? new StubAuthorizedWorkItemQueryService
@@ -345,6 +477,7 @@ public sealed class AnalystAiWorkflowServiceTests
                     CreateWorkItem("Orijinal talep"))
             },
             rewriteService ?? new StubAnalystRequestRewriteService(),
+            researchService ?? new StubUnresolvedTermResearchService(),
             repository,
             Microsoft.Extensions.Options.Options.Create(new GeminiOptions
             {
@@ -354,7 +487,8 @@ public sealed class AnalystAiWorkflowServiceTests
     }
 
     private static AnalystRequestRewriteResult CreateRewriteResult(
-        string rewrittenRequest)
+        string rewrittenRequest,
+        IReadOnlyList<string>? unresolvedTerms = null)
     {
         return new AnalystRequestRewriteResult
         {
@@ -368,7 +502,7 @@ public sealed class AnalystAiWorkflowServiceTests
                 }
             ],
             Ambiguities = ["Belirsizlik"],
-            UnresolvedTerms = ["Kurum içi terim"]
+            UnresolvedTerms = unresolvedTerms ?? ["Kurum içi terim"]
         };
     }
 
@@ -471,6 +605,27 @@ public sealed class AnalystAiWorkflowServiceTests
         {
             CallCount++;
             Description = originalRequestDescription;
+            return Task.FromResult(Result);
+        }
+    }
+
+    private sealed class StubUnresolvedTermResearchService
+        : IUnresolvedTermResearchService
+    {
+        public ServiceResult<UnresolvedTermResearchResult> Result { get; init; }
+            = ServiceResult<UnresolvedTermResearchResult>.Failure(
+                "Ayarlanmadı.");
+
+        public int CallCount { get; private set; }
+
+        public IReadOnlyCollection<string>? Terms { get; private set; }
+
+        public Task<ServiceResult<UnresolvedTermResearchResult>> ResearchAsync(
+            IReadOnlyCollection<string> unresolvedTerms,
+            CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            Terms = unresolvedTerms;
             return Task.FromResult(Result);
         }
     }

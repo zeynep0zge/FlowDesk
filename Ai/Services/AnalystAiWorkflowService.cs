@@ -41,17 +41,20 @@ public sealed class AnalystAiWorkflowService : IAnalystAiWorkflowService
 
     private readonly IAuthorizedWorkItemQueryService _queryService;
     private readonly IAnalystRequestRewriteService _rewriteService;
+    private readonly IUnresolvedTermResearchService _researchService;
     private readonly IWorkItemAiDraftRepository _draftRepository;
     private readonly GeminiOptions _geminiOptions;
 
     public AnalystAiWorkflowService(
         IAuthorizedWorkItemQueryService queryService,
         IAnalystRequestRewriteService rewriteService,
+        IUnresolvedTermResearchService researchService,
         IWorkItemAiDraftRepository draftRepository,
         IOptions<GeminiOptions> geminiOptions)
     {
         _queryService = queryService;
         _rewriteService = rewriteService;
+        _researchService = researchService;
         _draftRepository = draftRepository;
         _geminiOptions = geminiOptions.Value;
     }
@@ -99,6 +102,27 @@ public sealed class AnalystAiWorkflowService : IAnalystAiWorkflowService
                 "AI düzenleme işlemi tamamlanamadı.");
         }
 
+        IReadOnlyList<AbbreviationExplanation> abbreviations =
+            rewriteResult.Data.Abbreviations;
+        IReadOnlyList<string> unresolvedTerms =
+            rewriteResult.Data.UnresolvedTerms;
+
+        if (unresolvedTerms.Count > 0)
+        {
+            ServiceResult<UnresolvedTermResearchResult> researchResult =
+                await _researchService.ResearchAsync(
+                    unresolvedTerms,
+                    cancellationToken);
+
+            if (researchResult.IsSuccess && researchResult.Data != null)
+            {
+                (abbreviations, unresolvedTerms) = MergeResearchResult(
+                    abbreviations,
+                    unresolvedTerms,
+                    researchResult.Data.Terms);
+            }
+        }
+
         string generatedRequest = rewriteResult.Data.RewrittenRequest.Trim();
         if (generatedRequest.Length > WorkItemAiDraft.RequestMaximumLength)
         {
@@ -121,13 +145,13 @@ public sealed class AnalystAiWorkflowService : IAnalystAiWorkflowService
             GeneratedRequest = generatedRequest,
             EditedRequest = generatedRequest,
             AbbreviationsJson = JsonSerializer.Serialize(
-                rewriteResult.Data.Abbreviations,
+                abbreviations,
                 JsonOptions),
             AmbiguitiesJson = JsonSerializer.Serialize(
                 rewriteResult.Data.Ambiguities,
                 JsonOptions),
             UnresolvedTermsJson = JsonSerializer.Serialize(
-                rewriteResult.Data.UnresolvedTerms,
+                unresolvedTerms,
                 JsonOptions),
             ModelName = modelName,
             GeneratedAt = now,
@@ -331,5 +355,80 @@ public sealed class AnalystAiWorkflowService : IAnalystAiWorkflowService
         {
             return false;
         }
+    }
+
+    private static (
+        IReadOnlyList<AbbreviationExplanation> Abbreviations,
+        IReadOnlyList<string> UnresolvedTerms) MergeResearchResult(
+            IReadOnlyList<AbbreviationExplanation> existingAbbreviations,
+            IReadOnlyList<string> existingUnresolvedTerms,
+            IReadOnlyList<ResearchedTerm> researchedTerms)
+    {
+        var unresolvedNames = existingUnresolvedTerms
+            .Where(term => !string.IsNullOrWhiteSpace(term))
+            .Select(term => term.Trim())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var resolvedByTerm = researchedTerms
+            .Where(term => term.IsResolved &&
+                !string.IsNullOrWhiteSpace(term.Term) &&
+                unresolvedNames.Contains(term.Term.Trim()))
+            .GroupBy(term => term.Term.Trim(), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.First(),
+                StringComparer.OrdinalIgnoreCase);
+
+        var abbreviations = existingAbbreviations.ToList();
+        var abbreviationNames = abbreviations
+            .Select(item => item.Abbreviation)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (ResearchedTerm researchedTerm in resolvedByTerm.Values)
+        {
+            if (!abbreviationNames.Add(researchedTerm.Term.Trim()))
+            {
+                continue;
+            }
+
+            string expandedForm = FirstNonEmpty(
+                researchedTerm.ExpandedForm,
+                researchedTerm.TurkishMeaning,
+                researchedTerm.Term);
+
+            abbreviations.Add(new AbbreviationExplanation
+            {
+                Abbreviation = researchedTerm.Term.Trim(),
+                ExpandedForm = expandedForm,
+                Explanation = FirstNonEmptyOrNull(
+                    researchedTerm.Explanation,
+                    researchedTerm.TurkishMeaning)
+            });
+        }
+
+        IReadOnlyList<string> unresolvedTerms = existingUnresolvedTerms
+            .Where(term => !resolvedByTerm.ContainsKey(term.Trim()))
+            .ToArray();
+
+        return (abbreviations, unresolvedTerms);
+    }
+
+    private static string FirstNonEmpty(
+        string? first,
+        string? second,
+        string fallback)
+    {
+        return FirstNonEmptyOrNull(first, second) ?? fallback.Trim();
+    }
+
+    private static string? FirstNonEmptyOrNull(
+        string? first,
+        string? second)
+    {
+        if (!string.IsNullOrWhiteSpace(first))
+        {
+            return first.Trim();
+        }
+
+        return string.IsNullOrWhiteSpace(second) ? null : second.Trim();
     }
 }
