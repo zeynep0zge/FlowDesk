@@ -10,6 +10,8 @@ namespace FlowDesk.ViewModels.DepartmentManager
 
         public string RequestDescription { get; set; } = string.Empty;
 
+        public string? AiEditedRequest { get; set; }
+
         public string? Department { get; set; }
 
         public RequestPriority Priority { get; set; }
@@ -25,6 +27,9 @@ namespace FlowDesk.ViewModels.DepartmentManager
         public int? DeveloperId { get; set; }
 
         public string DeveloperDisplayName { get; set; } = string.Empty;
+
+        public List<FlowDesk.ViewModels.Analyst.UserSelectionOptionViewModel>
+            DeveloperOptions { get; set; } = [];
 
         public DateTime? ReleaseDate { get; set; }
 

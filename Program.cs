@@ -10,6 +10,12 @@ using FlowDesk.Options;
 using FlowDesk.Common;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
+using FlowDesk.Ai.Options;
+using FlowDesk.Ai.Gemini.Services;
+using FlowDesk.Ai.Interfaces;
+using FlowDesk.Ai.Services;
+using FlowDesk.Ai.Repositories;
+using FlowDesk.Ai.Repositories.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -135,15 +141,26 @@ builder.Services.AddScoped<
     IAuthorizedWorkItemQueryService,
     AuthorizedWorkItemQueryService>();
 
+builder.Services.AddScoped<
+    IAnalystAiWorkflowService,
+    AnalystAiWorkflowService>();
+
+builder.Services.AddScoped<
+    IWorkItemAiDraftRepository,
+    WorkItemAiDraftRepository>();
+
 builder.Services.AddScoped<IAnalystWorkflowService, AnalystWorkflowService>();
 
 builder.Services.AddScoped<
     IDepartmentManagerWorkflowService,
     DepartmentManagerWorkflowService>();
 
-builder.Services.AddScoped<
-    IExcelExportService,
-    ExcelExportService>();
+builder.Services.Configure<ApprovedWorkItemExcelOptions>(
+    builder.Configuration.GetSection(
+        ApprovedWorkItemExcelOptions.SectionName));
+builder.Services.AddSingleton<
+    IApprovedWorkItemExcelService,
+    ApprovedWorkItemExcelService>();
 
 builder.Services.AddScoped<
     IPasswordHasher<PasswordResetRequest>,
@@ -152,6 +169,23 @@ builder.Services.AddScoped<
 builder.Services.AddScoped<
     IPasswordHasher<EmailVerificationRequest>,
     PasswordHasher<EmailVerificationRequest>>();
+
+builder.Services.Configure<GeminiOptions>(
+    builder.Configuration.GetSection(GeminiOptions.SectionName));
+
+builder.Services.AddHttpClient<
+    IAnalystRequestRewriteService,
+    GeminiAnalystRequestRewriteService>(httpClient =>
+    {
+        httpClient.Timeout = Timeout.InfiniteTimeSpan;
+    });
+
+builder.Services.AddHttpClient<
+    IUnresolvedTermResearchService,
+    GeminiUnresolvedTermResearchService>(httpClient =>
+    {
+        httpClient.Timeout = Timeout.InfiniteTimeSpan;
+    });
 
 var app = builder.Build();
 

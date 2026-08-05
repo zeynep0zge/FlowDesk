@@ -91,6 +91,13 @@ public sealed class GlobalDepartmentManagerAuthorizationTests
     public async Task GlobalManager_CanApproveOtherDepartmentRequest()
     {
         await SeedGlobalManagerAsync();
+        ApplicationUser developer = await WithServicesAsync(services =>
+            TestDataSeeder.CreateUserAsync(
+                services,
+                TestDataSeeder.UniqueEmail("global-approval-developer"),
+                assignedRole: AppRoles.Employee,
+                department: OtherDepartment,
+                businessCode: "ENG-GLOBAL-000001"));
         WorkItem target = await CreateWorkItemAsync(
             WorkflowStatus.WaitingManagerApproval,
             OtherDepartment);
@@ -100,7 +107,10 @@ public sealed class GlobalDepartmentManagerAuthorizationTests
             await client.PostFormWithAntiforgeryAsync(
                 $"/DepartmentManager/Review/{target.Id}",
                 $"/DepartmentManager/Approve/{target.Id}",
-                new Dictionary<string, string>());
+                new Dictionary<string, string>
+                {
+                    ["DeveloperId"] = developer.Id.ToString()
+                });
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.Equal(
@@ -133,30 +143,43 @@ public sealed class GlobalDepartmentManagerAuthorizationTests
     }
 
     [Fact]
-    public async Task GlobalManager_CanExportApprovedRequestsFromAllDepartments()
+    public async Task GlobalManager_CanDownloadSharedExcel()
     {
         await SeedGlobalManagerAsync();
-        WorkItem first = await CreateWorkItemAsync(
+        using HttpClient client = ManagerClient(GlobalManagerId);
+
+        HttpResponseMessage pageResponse = await client.GetAsync(
+            "/DepartmentManager/SharedExcel");
+        HttpResponseMessage downloadResponse = await client.GetAsync(
+            "/DepartmentManager/DownloadSharedExcel");
+
+        Assert.Equal(HttpStatusCode.OK, pageResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, downloadResponse.StatusCode);
+        Assert.Equal(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            downloadResponse.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task GlobalManager_SharedExcelListsApprovedRequestsWithoutDownload()
+    {
+        await SeedGlobalManagerAsync();
+        WorkItem approved = await CreateWorkItemAsync(
             WorkflowStatus.Approved,
-            TestDataSeeder.DefaultDepartment);
-        WorkItem second = await CreateWorkItemAsync(
-            WorkflowStatus.Approved,
+            OtherDepartment);
+        WorkItem pending = await CreateWorkItemAsync(
+            WorkflowStatus.WaitingManagerApproval,
             OtherDepartment);
         using HttpClient client = ManagerClient(GlobalManagerId);
 
-        HttpResponseMessage firstResponse = await client.GetAsync(
-            $"/DepartmentManager/DownloadExcel/{first.Id}");
-        HttpResponseMessage secondResponse = await client.GetAsync(
-            $"/DepartmentManager/DownloadExcel/{second.Id}");
+        HttpResponseMessage response = await client.GetAsync(
+            "/DepartmentManager/SharedExcel");
+        string body = await response.Content.ReadAsStringAsync();
 
-        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, secondResponse.StatusCode);
-        Assert.Equal(
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            firstResponse.Content.Headers.ContentType?.MediaType);
-        Assert.Equal(
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            secondResponse.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains(approved.RequestNumber, body, StringComparison.Ordinal);
+        Assert.DoesNotContain(pending.RequestNumber, body, StringComparison.Ordinal);
+        Assert.Equal(0, Factory.ApprovedExcel.DownloadCallCount);
     }
 
     [Fact]
@@ -178,6 +201,7 @@ public sealed class GlobalDepartmentManagerAuthorizationTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains(first.RequestNumber, body, StringComparison.Ordinal);
         Assert.Contains(second.RequestNumber, body, StringComparison.Ordinal);
+        Assert.DoesNotContain("Excel İndir", body, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 using FlowDesk.Data;
 using FlowDesk.Models;
 using FlowDesk.Repositories.Interfaces;
+using FlowDesk.Services.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace FlowDesk.Repositories
@@ -115,6 +116,53 @@ namespace FlowDesk.Repositories
                 .ToListAsync();
         }
 
+        public Task<List<ApprovedWorkItemListItemResult>>
+            GetApprovedWorkItemListAsync(
+                string department,
+                bool canAccessAllDepartments)
+        {
+            return (
+                from workItem in _context.WorkItems.AsNoTracking()
+                join analyst in _context.Users.AsNoTracking()
+                    on workItem.AnalystId equals (int?)analyst.Id
+                    into analysts
+                from analyst in analysts.DefaultIfEmpty()
+                join developer in _context.Users.AsNoTracking()
+                    on workItem.DeveloperId equals (int?)developer.Id
+                    into developers
+                from developer in developers.DefaultIfEmpty()
+                where workItem.WorkflowStatus == WorkflowStatus.Approved &&
+                    (canAccessAllDepartments ||
+                     workItem.Department == department)
+                orderby workItem.UpdatedAt ?? workItem.CreatedAt descending
+                select new ApprovedWorkItemListItemResult
+                {
+                    Id = workItem.Id,
+                    DeveloperId = workItem.DeveloperId,
+                    Department = workItem.Department,
+                    AnalystFullName = analyst == null
+                        ? string.Empty
+                        : analyst.FullName,
+                    AnalystBusinessCode = analyst == null
+                        ? null
+                        : analyst.BusinessCode,
+                    DeveloperFullName = developer == null
+                        ? string.Empty
+                        : developer.FullName,
+                    DeveloperBusinessCode = developer == null
+                        ? null
+                        : developer.BusinessCode,
+                    ReleaseDate = workItem.ReleaseDate,
+                    BanksoftDeliveryDate = workItem.BanksoftDeliveryDate,
+                    ExpectedStatus = workItem.ExpectedStatus,
+                    CurrentStatus = workItem.CurrentStatus,
+                    RequestNumber = workItem.RequestNumber,
+                    RequestDescription = workItem.RequestDescription,
+                    RowVersion = workItem.RowVersion
+                })
+                .ToListAsync();
+        }
+
         public async Task<WorkItem?> GetManagerWorkItemByIdAsync(
             int id,
             string department,
@@ -176,6 +224,15 @@ namespace FlowDesk.Repositories
             return await _context.WorkItems
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.Id == id);
+        }
+
+        public void SetOriginalRowVersion(
+            WorkItem workItem,
+            byte[] rowVersion)
+        {
+            _context.Entry(workItem)
+                .Property(entity => entity.RowVersion)
+                .OriginalValue = rowVersion;
         }
 
         public async Task<int> SaveChangesAsync()

@@ -22,12 +22,20 @@ namespace FlowDesk.Services.Interfaces
                 ReturnToAnalystDto dto,
                 int? managerUserId);
 
+        Task<ServiceResult>
+            RejectRequestAsync(
+                RejectRequestDto dto,
+                int? managerUserId);
+
         Task<ServiceResult<List<ManagerInboxItemViewModel>>>
             GetApprovedRequestsAsync(int? managerUserId);
 
-        Task<ServiceResult<ManagerReviewViewModel>>
-            GetApprovedRequestForExportAsync(
-                int id,
-                int? managerUserId);
+        Task<ServiceResult<SharedExcelViewModel>>
+            GetSharedExcelAsync(int? managerUserId);
+
+        Task<ServiceResult> EditApprovedWorkItemAsync(
+            EditApprovedWorkItemDto dto,
+            int? managerUserId);
+
     }
 }

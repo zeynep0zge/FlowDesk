@@ -1,0 +1,325 @@
+@using FlowDesk.Constants
+@model FlowDesk.ViewModels.DepartmentManager.SharedExcelViewModel
+
+@{
+    ViewData["Title"] = "Ortak Excel";
+    var requests = Model?.Requests ?? [];
+}
+
+<style>
+    .shared-excel-table {
+        font-size: .875rem;
+    }
+
+    .shared-excel-table th,
+    .shared-excel-table td {
+        padding: .55rem .65rem;
+        vertical-align: middle;
+    }
+
+    .request-preview {
+        display: -webkit-box;
+        max-width: 28rem;
+        overflow: hidden;
+        overflow-wrap: anywhere;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 3;
+    }
+</style>
+
+<div class="container-fluid p-0">
+    <header class="page-header">
+        <div>
+            <h1>Ortak Excel</h1>
+            <p class="text-secondary mb-0">
+                Onaylanan talepleri bu ekran üzerinden görüntüleyebilir ve düzenleyebilirsiniz. Ortak Excel dosyası otomatik güncellenir.
+            </p>
+        </div>
+    </header>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success" role="alert">
+            @TempData["SuccessMessage"]
+        </div>
+    }
+
+    @if (TempData["WarningMessage"] != null)
+    {
+        <div class="alert alert-warning" role="alert">
+            @TempData["WarningMessage"]
+        </div>
+    }
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger" role="alert">
+            @TempData["ErrorMessage"]
+        </div>
+    }
+
+    <section class="modern-card">
+        <div class="p-4">
+            <a asp-action="DownloadSharedExcel"
+               class="btn btn-success">
+                Ortak Excel’i İndir
+            </a>
+            <span class="text-secondary small ms-2">
+                Yalnız paylaşım ve arşiv amacıyla kullanın.
+            </span>
+        </div>
+    </section>
+
+    <section class="modern-card mt-4">
+        <div class="p-4">
+            <h2 class="h5 mb-3">Onaylanan Talepler</h2>
+
+            @if (requests.Count == 0)
+            {
+                <div class="empty-state">
+                    <p class="text-secondary mb-0">
+                        Onaylanan talep bulunmuyor.
+                    </p>
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover shared-excel-table mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Analist</th>
+                                <th>Yazılımcı</th>
+                                <th>Sürüm Tarihi</th>
+                                <th>Banksoft Teslim Tarihi</th>
+                                <th>Beklenen Statü</th>
+                                <th>Mevcut Statü</th>
+                                <th>Talep No</th>
+                                <th>Talep</th>
+                                <th class="text-end">İşlem</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in requests)
+                            {
+                                <tr>
+                                    <td>@DisplayValue(item.AnalystDisplayName)</td>
+                                    <td>@DisplayValue(item.DeveloperDisplayName)</td>
+                                    <td class="text-nowrap">
+                                        @(item.ReleaseDate?.ToString("dd.MM.yyyy") ?? "-")
+                                    </td>
+                                    <td class="text-nowrap">
+                                        @(item.BanksoftDeliveryDate?.ToString("dd.MM.yyyy") ?? "-")
+                                    </td>
+                                    <td>@DisplayValue(item.ExpectedStatus)</td>
+                                    <td>@DisplayValue(item.CurrentStatus)</td>
+                                    <td class="text-nowrap fw-semibold">
+                                        @item.RequestNumber
+                                    </td>
+                                    <td>
+                                        <div class="request-preview">@item.RequestPreview</div>
+                                        @if (item.IsRequestTruncated)
+                                        {
+                                            <button type="button"
+                                                    class="btn btn-link btn-sm p-0 mt-1"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#requestDetailModal-@item.Id">
+                                                Detay
+                                            </button>
+                                        }
+                                    </td>
+                                    <td class="text-end text-nowrap">
+                                        <button type="button"
+                                                class="btn btn-outline-primary btn-sm"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#editRequestModal-@item.Id">
+                                            Düzenle
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                @foreach (var item in requests)
+                {
+                    @if (item.IsRequestTruncated)
+                    {
+                        <div class="modal fade"
+                             id="requestDetailModal-@item.Id"
+                             tabindex="-1"
+                             aria-labelledby="requestDetailTitle-@item.Id"
+                             aria-hidden="true">
+                            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h2 class="modal-title fs-5"
+                                            id="requestDetailTitle-@item.Id">
+                                            Talep Detayı — @item.RequestNumber
+                                        </h2>
+                                        <button type="button"
+                                                class="btn-close"
+                                                data-bs-dismiss="modal"
+                                                aria-label="Kapat"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <p class="mb-0 text-break"
+                                           style="white-space: pre-wrap;">@item.RequestDescription</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="modal fade"
+                         id="editRequestModal-@item.Id"
+                         tabindex="-1"
+                         aria-labelledby="editRequestTitle-@item.Id"
+                         aria-hidden="true">
+                        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                            <div class="modal-content">
+                                <form asp-action="EditApprovedWorkItem"
+                                      asp-route-id="@item.Id"
+                                      method="post">
+                                    <div class="modal-header">
+                                        <h2 class="modal-title fs-5"
+                                            id="editRequestTitle-@item.Id">
+                                            Talebi Düzenle
+                                        </h2>
+                                        <button type="button"
+                                                class="btn-close"
+                                                data-bs-dismiss="modal"
+                                                aria-label="Kapat"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <input type="hidden"
+                                               name="RowVersion"
+                                               value="@item.RowVersion" />
+
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Analist</label>
+                                                <input class="form-control"
+                                                       value="@item.AnalystDisplayName"
+                                                       readonly />
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Talep No</label>
+                                                <input class="form-control"
+                                                       value="@item.RequestNumber"
+                                                       readonly />
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label" for="developer-@item.Id">Yazılımcı</label>
+                                                <select class="form-select"
+                                                        id="developer-@item.Id"
+                                                        name="DeveloperId"
+                                                        required>
+                                                    <option value="">Seçiniz</option>
+                                                    @foreach (var developer in item.DeveloperOptions)
+                                                    {
+                                                        if (developer.Id == item.DeveloperId)
+                                                        {
+                                                            <option value="@developer.Id" selected>@developer.DisplayText</option>
+                                                        }
+                                                        else
+                                                        {
+                                                            <option value="@developer.Id">@developer.DisplayText</option>
+                                                        }
+                                                    }
+                                                </select>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label" for="releaseDate-@item.Id">Sürüm Tarihi</label>
+                                                <input class="form-control"
+                                                       id="releaseDate-@item.Id"
+                                                       name="ReleaseDate"
+                                                       type="date"
+                                                       value="@(item.ReleaseDate?.ToString("yyyy-MM-dd"))"
+                                                       required />
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label" for="deliveryDate-@item.Id">Banksoft Teslim Tarihi</label>
+                                                <input class="form-control"
+                                                       id="deliveryDate-@item.Id"
+                                                       name="BanksoftDeliveryDate"
+                                                       type="date"
+                                                       value="@(item.BanksoftDeliveryDate?.ToString("yyyy-MM-dd"))"
+                                                       required />
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label" for="expectedStatus-@item.Id">Beklenen Statü</label>
+                                                <input class="form-control"
+                                                       id="expectedStatus-@item.Id"
+                                                       name="ExpectedStatus"
+                                                       maxlength="100"
+                                                       value="@item.ExpectedStatus"
+                                                       required />
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label" for="currentStatus-@item.Id">Mevcut Statü</label>
+                                                <select class="form-select"
+                                                        id="currentStatus-@item.Id"
+                                                        name="CurrentStatus"
+                                                        required>
+                                                    @foreach (string status in CurrentStatusOptions(item.CurrentStatus))
+                                                    {
+                                                        if (status == item.CurrentStatus)
+                                                        {
+                                                            <option value="@status" selected>@status</option>
+                                                        }
+                                                        else
+                                                        {
+                                                            <option value="@status">@status</option>
+                                                        }
+                                                    }
+                                                </select>
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label" for="request-@item.Id">Talep</label>
+                                                <textarea class="form-control"
+                                                          id="request-@item.Id"
+                                                          name="RequestDescription"
+                                                          rows="6"
+                                                          maxlength="2000"
+                                                          required>@item.RequestDescription</textarea>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button"
+                                                class="btn btn-outline-secondary"
+                                                data-bs-dismiss="modal">
+                                            Vazgeç
+                                        </button>
+                                        <button type="submit" class="btn btn-primary">
+                                            Kaydet
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </section>
+</div>
+
+@functions {
+    private static string DisplayValue(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "-" : value;
+    }
+
+    private static IReadOnlyList<string> CurrentStatusOptions(
+        string currentStatus)
+    {
+        return AnalystCurrentStatusOptions.All
+            .Append(currentStatus)
+            .Where(status => !string.IsNullOrWhiteSpace(status))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+    }
+}

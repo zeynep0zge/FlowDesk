@@ -6,6 +6,9 @@
 # dotenv files
 .env
 
+# Runtime-managed shared Excel file
+/App_Data/*.xlsx
+
 # User-specific files
 *.rsuser
 *.suo

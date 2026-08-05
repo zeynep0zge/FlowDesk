@@ -13,9 +13,6 @@ public sealed class WorkflowStatusPolicyTests
     public static TheoryData<WorkflowStatus, bool> ManagerApprovalStatuses =>
         CreateStatusData(WorkflowStatus.WaitingManagerApproval);
 
-    public static TheoryData<WorkflowStatus, bool> ApprovedStatuses =>
-        CreateStatusData(WorkflowStatus.Approved);
-
     public static TheoryData<WorkflowStatus, bool> SubmittedStatuses =>
         CreateStatusData(WorkflowStatus.Submitted);
 
@@ -83,17 +80,6 @@ public sealed class WorkflowStatusPolicyTests
         Assert.Equal(
             expected,
             WorkflowStatusPolicy.CanDepartmentManagerReturnToAnalyst(status));
-    }
-
-    [Theory]
-    [MemberData(nameof(ApprovedStatuses))]
-    public void CanDepartmentManagerExport_ReturnsExpectedResult(
-        WorkflowStatus status,
-        bool expected)
-    {
-        Assert.Equal(
-            expected,
-            WorkflowStatusPolicy.CanDepartmentManagerExport(status));
     }
 
     [Theory]

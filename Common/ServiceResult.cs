@@ -8,6 +8,8 @@ public class ServiceResult
 
     public bool IsForbidden { get; init; }
 
+    public bool IsConflict { get; init; }
+
     public string? ErrorMessage { get; init; }
 
     public string? SuccessMessage { get; init; }
@@ -57,6 +59,16 @@ public class ServiceResult
             ErrorMessage = errorMessage
         };
     }
+
+    public static ServiceResult Conflict(string errorMessage)
+    {
+        return new ServiceResult
+        {
+            IsSuccess = false,
+            IsConflict = true,
+            ErrorMessage = errorMessage
+        };
+    }
 }
 
 public class ServiceResult<T> : ServiceResult
@@ -97,6 +109,16 @@ public class ServiceResult<T> : ServiceResult
         {
             IsSuccess = false,
             IsForbidden = true,
+            ErrorMessage = errorMessage
+        };
+    }
+
+    public new static ServiceResult<T> Conflict(string errorMessage)
+    {
+        return new ServiceResult<T>
+        {
+            IsSuccess = false,
+            IsConflict = true,
             ErrorMessage = errorMessage
         };
     }

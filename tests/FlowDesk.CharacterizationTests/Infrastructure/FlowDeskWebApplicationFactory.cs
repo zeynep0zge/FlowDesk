@@ -34,6 +34,9 @@ public sealed class FlowDeskWebApplicationFactory
     public FakeEmailService Email =>
         Services.GetRequiredService<FakeEmailService>();
 
+    public FakeApprovedWorkItemExcelService ApprovedExcel =>
+        Services.GetRequiredService<FakeApprovedWorkItemExcelService>();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment(_environmentName);
@@ -86,6 +89,12 @@ public sealed class FlowDeskWebApplicationFactory
             services.AddSingleton<IEmailService>(provider =>
                 provider.GetRequiredService<FakeEmailService>());
 
+            services.RemoveAll<IApprovedWorkItemExcelService>();
+            services.AddSingleton<FakeApprovedWorkItemExcelService>();
+            services.AddSingleton<IApprovedWorkItemExcelService>(provider =>
+                provider.GetRequiredService<
+                    FakeApprovedWorkItemExcelService>());
+
             services
                 .AddAuthentication(options =>
                 {
@@ -135,6 +144,7 @@ public sealed class FlowDeskWebApplicationFactory
         await IdentitySeeder.BackfillBusinessCodesAsync(
             scope.ServiceProvider);
         Email.Clear();
+        ApprovedExcel.Clear();
     }
 
     protected override void Dispose(bool disposing)

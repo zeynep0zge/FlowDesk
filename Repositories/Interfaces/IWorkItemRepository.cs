@@ -1,4 +1,5 @@
 using FlowDesk.Models;
+using FlowDesk.Services.Models;
 
 namespace FlowDesk.Repositories.Interfaces
 {
@@ -34,6 +35,11 @@ namespace FlowDesk.Repositories.Interfaces
                 string department,
                 bool canAccessAllDepartments);
 
+        Task<List<ApprovedWorkItemListItemResult>>
+            GetApprovedWorkItemListAsync(
+                string department,
+                bool canAccessAllDepartments);
+
         Task<WorkItem?> GetManagerWorkItemByIdAsync(
             int id,
             string department,
@@ -55,6 +61,10 @@ namespace FlowDesk.Repositories.Interfaces
 
         Task<WorkItem?>
             GetByIdAsNoTrackingAsync(int id);
+
+        void SetOriginalRowVersion(
+            WorkItem workItem,
+            byte[] rowVersion);
 
         Task<int> SaveChangesAsync();
     }

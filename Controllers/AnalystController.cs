@@ -1,3 +1,5 @@
+using FlowDesk.Ai.Interfaces;
+using FlowDesk.Ai.Models;
 using FlowDesk.Constants;
 using FlowDesk.DTOs.Analyst;
 using FlowDesk.Services.Interfaces;
@@ -13,11 +15,21 @@ namespace FlowDesk.Controllers
     {
         private readonly IAnalystWorkflowService
             _analystWorkflowService;
+        private readonly IAuthenticatedActorContextResolver
+            _authenticatedActorContextResolver;
+        private readonly IAnalystAiWorkflowService
+            _analystAiWorkflowService;
 
         public AnalystController(
-            IAnalystWorkflowService analystWorkflowService)
+            IAnalystWorkflowService analystWorkflowService,
+            IAuthenticatedActorContextResolver
+                authenticatedActorContextResolver,
+            IAnalystAiWorkflowService analystAiWorkflowService)
         {
             _analystWorkflowService = analystWorkflowService;
+            _authenticatedActorContextResolver =
+                authenticatedActorContextResolver;
+            _analystAiWorkflowService = analystAiWorkflowService;
         }
 
         [HttpGet]
@@ -115,6 +127,118 @@ namespace FlowDesk.Controllers
                 nameof(Review),
                 new { id }
             );
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RewriteWithAi(
+            int id,
+            CancellationToken cancellationToken)
+        {
+            var actorResult =
+                await _authenticatedActorContextResolver.ResolveAsync(User);
+
+            if (actorResult.IsForbidden)
+            {
+                return Forbid();
+            }
+
+            if (!actorResult.IsSuccess || actorResult.Data == null)
+            {
+                return BadRequest(new
+                {
+                    errorMessage = actorResult.ErrorMessage ??
+                        "Kullanıcı bilgileri doğrulanamadı."
+                });
+            }
+
+            var result = await _analystAiWorkflowService
+                .RewriteWorkItemAsync(
+                    id,
+                    actorResult.Data,
+                    cancellationToken);
+
+            if (result.IsNotFound)
+            {
+                return NotFound();
+            }
+
+            if (result.IsForbidden)
+            {
+                return Forbid();
+            }
+
+            if (!result.IsSuccess || result.Data == null)
+            {
+                return BadRequest(new
+                {
+                    errorMessage = result.ErrorMessage ??
+                        "AI düzenleme işlemi tamamlanamadı."
+                });
+            }
+
+            return Ok(result.Data);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SaveAiDraft(
+            int id,
+            SaveAnalystAiDraftRequest request,
+            CancellationToken cancellationToken)
+        {
+            var actorResult =
+                await _authenticatedActorContextResolver.ResolveAsync(User);
+
+            if (actorResult.IsForbidden)
+            {
+                return Forbid();
+            }
+
+            if (!actorResult.IsSuccess || actorResult.Data == null)
+            {
+                return BadRequest(new
+                {
+                    errorMessage = actorResult.ErrorMessage ??
+                        "Kullanıcı bilgileri doğrulanamadı."
+                });
+            }
+
+            var result = await _analystAiWorkflowService
+                .SaveEditedDraftAsync(
+                    id,
+                    actorResult.Data,
+                    request,
+                    cancellationToken);
+
+            if (result.IsNotFound)
+            {
+                return NotFound();
+            }
+
+            if (result.IsForbidden)
+            {
+                return Forbid();
+            }
+
+            if (result.IsConflict)
+            {
+                return Conflict(new
+                {
+                    errorMessage = result.ErrorMessage
+                });
+            }
+
+            if (!result.IsSuccess || result.Data == null)
+            {
+                return BadRequest(new
+                {
+                    errorMessage = result.ErrorMessage ??
+                        "AI taslağı kaydedilemedi."
+                });
+            }
+
+            return Ok(result.Data);
         }
 
         [HttpPost]

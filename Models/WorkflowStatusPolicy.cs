@@ -34,9 +34,9 @@ public static class WorkflowStatusPolicy
         return status == WorkflowStatus.WaitingManagerApproval;
     }
 
-    public static bool CanDepartmentManagerExport(WorkflowStatus status)
+    public static bool CanDepartmentManagerReject(WorkflowStatus status)
     {
-        return status == WorkflowStatus.Approved;
+        return status == WorkflowStatus.WaitingManagerApproval;
     }
 
     public static bool CanProjectManagerEdit(WorkflowStatus status)

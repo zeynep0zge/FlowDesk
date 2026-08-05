@@ -17,19 +17,20 @@ namespace FlowDesk.Controllers
         private readonly IDepartmentManagerWorkflowService
             _departmentManagerWorkflowService;
 
-        private readonly IExcelExportService _excelExportService;
+        private readonly IApprovedWorkItemExcelService
+            _approvedWorkItemExcelService;
         private readonly IAccountApprovalService
             _accountApprovalService;
 
         public DepartmentManagerController(
             IDepartmentManagerWorkflowService departmentManagerWorkflowService,
-            IExcelExportService excelExportService,
+            IApprovedWorkItemExcelService approvedWorkItemExcelService,
             IAccountApprovalService accountApprovalService)
         {
             _departmentManagerWorkflowService =
                 departmentManagerWorkflowService;
 
-            _excelExportService = excelExportService;
+            _approvedWorkItemExcelService = approvedWorkItemExcelService;
             _accountApprovalService = accountApprovalService;
         }
 
@@ -123,8 +124,15 @@ namespace FlowDesk.Controllers
                     new { id });
             }
 
-            TempData["SuccessMessage"] =
-                "Talep başarıyla onaylandı.";
+            if (!string.IsNullOrWhiteSpace(result.SuccessMessage))
+            {
+                TempData["WarningMessage"] = result.SuccessMessage;
+            }
+            else
+            {
+                TempData["SuccessMessage"] =
+                    "Talep başarıyla onaylandı.";
+            }
 
             return RedirectToAction(
                 nameof(ApprovedRequests));
@@ -169,14 +177,16 @@ namespace FlowDesk.Controllers
 
             return RedirectToAction(nameof(Inbox));
         }
-        [HttpGet]
-        public async Task<IActionResult> DownloadExcel(int id)
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Reject(
+            int id,
+            RejectRequestDto dto)
         {
-            var result =
-                await _departmentManagerWorkflowService
-                    .GetApprovedRequestForExportAsync(
-                        id,
-                        GetCurrentUserId());
+            dto.WorkItemId = id;
+            var result = await _departmentManagerWorkflowService
+                .RejectRequestAsync(dto, GetCurrentUserId());
 
             if (result.IsNotFound)
             {
@@ -188,31 +198,96 @@ namespace FlowDesk.Controllers
                 return Forbid();
             }
 
+            if (!result.IsSuccess)
+            {
+                TempData["ErrorMessage"] = result.ErrorMessage;
+                return RedirectToAction(nameof(Review), new { id });
+            }
+
+            TempData["SuccessMessage"] = "Talep reddedildi.";
+            return RedirectToAction(nameof(Inbox));
+        }
+        [HttpGet]
+        public async Task<IActionResult> SharedExcel()
+        {
+            var result = await _departmentManagerWorkflowService
+                .GetSharedExcelAsync(GetCurrentUserId());
+
+            if (result.IsForbidden)
+            {
+                return Forbid();
+            }
+
             if (!result.IsSuccess || result.Data == null)
             {
                 TempData["ErrorMessage"] = result.ErrorMessage;
-
-                return RedirectToAction(nameof(ApprovedRequests));
+                return View();
             }
 
-            byte[] excelFile =
-                _excelExportService
-                    .CreateApprovedRequestExcel(result.Data);
+            return View(result.Data);
+        }
 
-            string safeRequestNumber =
-                string.Join(
-                    "_",
-                    result.Data.RequestNumber.Split(
-                        Path.GetInvalidFileNameChars(),
-                        StringSplitOptions.RemoveEmptyEntries));
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditApprovedWorkItem(
+            int id,
+            EditApprovedWorkItemDto dto)
+        {
+            dto.WorkItemId = id;
+            var result = await _departmentManagerWorkflowService
+                .EditApprovedWorkItemAsync(dto, GetCurrentUserId());
 
-            string fileName =
-                $"FlowDesk_{safeRequestNumber}.xlsx";
+            if (result.IsNotFound)
+            {
+                return NotFound();
+            }
+
+            if (result.IsForbidden)
+            {
+                return Forbid();
+            }
+
+            if (result.IsConflict)
+            {
+                TempData["ErrorMessage"] = result.ErrorMessage;
+                return RedirectToAction(nameof(SharedExcel));
+            }
+
+            if (!result.IsSuccess)
+            {
+                TempData["ErrorMessage"] = result.ErrorMessage;
+                return RedirectToAction(nameof(SharedExcel));
+            }
+
+            if (!string.IsNullOrWhiteSpace(result.SuccessMessage))
+            {
+                TempData["WarningMessage"] = result.SuccessMessage;
+            }
+            else
+            {
+                TempData["SuccessMessage"] =
+                    "Değişiklikler kaydedildi.";
+            }
+
+            return RedirectToAction(nameof(SharedExcel));
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> DownloadSharedExcel(
+            CancellationToken cancellationToken)
+        {
+            var result = await _approvedWorkItemExcelService.DownloadAsync(
+                cancellationToken);
+            if (!result.IsSuccess || result.Data == null)
+            {
+                TempData["ErrorMessage"] = result.ErrorMessage;
+                return RedirectToAction(nameof(SharedExcel));
+            }
 
             return File(
-                excelFile,
+                result.Data.Content,
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                fileName);
+                result.Data.FileName);
         }
 
         [HttpGet]

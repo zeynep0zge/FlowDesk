@@ -129,17 +129,17 @@ public sealed class DepartmentManagerAuthorizationTests
     }
 
     [Fact]
-    public async Task DownloadExcel_DifferentDepartmentWorkItem_IsNotFound()
+    public async Task SharedExcel_ProjectManager_IsForbidden()
     {
-        WorkItem target = await CreateWorkItemAsync(
-            WorkflowStatus.Approved,
-            OtherDepartment);
-        using HttpClient client = ManagerClient();
+        using HttpClient client = CreateClient().AuthenticateAs(
+            101,
+            AppRoles.ProjectManager,
+            TestDataSeeder.UniqueEmail("project-manager-shared-excel"));
 
         HttpResponseMessage response = await client.GetAsync(
-            $"/DepartmentManager/DownloadExcel/{target.Id}");
+            "/DepartmentManager/SharedExcel");
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
