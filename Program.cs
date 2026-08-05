@@ -155,9 +155,12 @@ builder.Services.AddScoped<
     IDepartmentManagerWorkflowService,
     DepartmentManagerWorkflowService>();
 
-builder.Services.AddScoped<
-    IExcelExportService,
-    ExcelExportService>();
+builder.Services.Configure<ApprovedWorkItemExcelOptions>(
+    builder.Configuration.GetSection(
+        ApprovedWorkItemExcelOptions.SectionName));
+builder.Services.AddSingleton<
+    IApprovedWorkItemExcelService,
+    ApprovedWorkItemExcelService>();
 
 builder.Services.AddScoped<
     IPasswordHasher<PasswordResetRequest>,

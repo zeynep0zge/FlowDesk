@@ -35,8 +35,13 @@
                         <div class="detail-item"><div class="detail-label">Beklenen Stat&#252;</div><div class="detail-value">@(Model.ExpectedStatus ?? "-")</div></div>
                         <div class="detail-item"><div class="detail-label">Mevcut Stat&#252;</div><div class="detail-value">@(Model.CurrentStatus ?? "-")</div></div>
                     </div>
-                    <div class="mt-4"><h3 class="h6 fw-bold">Talep A&#231;&#305;klamas&#305;</h3><div class="detail-note">@Model.RequestDescription</div></div>
+                    <div class="mt-4"><h3 class="h6 fw-bold">Orijinal Talep A&#231;&#305;klamas&#305;</h3><div class="detail-note">@Model.RequestDescription</div></div>
+                    @if (!string.IsNullOrWhiteSpace(Model.AiEditedRequest))
+                    {
+                        <div class="mt-4"><h3 class="h6 fw-bold">Kay&#305;tl&#305; AI Talep D&#252;zenlemesi</h3><div class="detail-note">@Model.AiEditedRequest</div></div>
+                    }
                     <div class="mt-4"><h3 class="h6 fw-bold">Analist Notu</h3><div class="detail-note">@(Model.AnalystNote ?? "Analist notu bulunmuyor.")</div></div>
+                    <div class="mt-4"><h3 class="h6 fw-bold">Y&#246;netici Notu</h3><div class="detail-note">@(Model.ManagerNote ?? "Yönetici notu bulunmuyor.")</div></div>
                 </div>
             </section>
         </div>
@@ -47,6 +52,17 @@
                 <form method="post">
                     @Html.AntiForgeryToken()
                     <div class="mb-3">
+                        <label for="developerId" class="form-label">Yaz&#305;l&#305;mc&#305;</label>
+                        <select id="developerId" name="DeveloperId" class="form-select">
+                            <option value="">Yaz&#305;l&#305;mc&#305; se&#231;in</option>
+                            @foreach (var developer in Model.DeveloperOptions)
+                            {
+                                <option value="@developer.Id" selected="@(Model.DeveloperId == developer.Id)">@developer.DisplayText</option>
+                            }
+                        </select>
+                        <div class="form-text">Onay i&#351;leminde yaz&#305;l&#305;mc&#305; se&#231;imi zorunludur.</div>
+                    </div>
+                    <div class="mb-3">
                         <label for="managerNote" class="form-label">Y&#246;netici Notu</label>
                         <textarea id="managerNote" name="ManagerNote" class="form-control" rows="7" maxlength="1000" placeholder="Onay veya iade a&#231;&#305;klamas&#305;n&#305; yaz&#305;n.">@Model.ManagerNote</textarea>
                         <div class="form-text">Analiste iade i&#351;leminde y&#246;netici notu zorunludur.</div>
@@ -54,6 +70,7 @@
                     <div class="d-grid gap-2">
                         <button type="submit" formaction="@Url.Action("Approve", "DepartmentManager", new { id = Model.Id })" class="btn btn-success">Talebi Onayla</button>
                         <button type="submit" formaction="@Url.Action("ReturnToAnalyst", "DepartmentManager", new { id = Model.Id })" class="btn btn-danger">Analiste &#304;ade Et</button>
+                        <button type="submit" formaction="@Url.Action("Reject", "DepartmentManager", new { id = Model.Id })" class="btn btn-outline-danger">Talebi Reddet</button>
                     </div>
                 </form>
             </section>

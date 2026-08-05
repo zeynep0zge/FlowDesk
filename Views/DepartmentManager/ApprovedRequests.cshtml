@@ -58,6 +58,19 @@
         </div>
     }
 
+    @if (TempData["WarningMessage"] != null)
+    {
+        <div class="alert alert-warning alert-dismissible fade show"
+             role="alert">
+            @TempData["WarningMessage"]
+            <button type="button"
+                    class="btn-close"
+                    data-bs-dismiss="alert"
+                    aria-label="Kapat">
+            </button>
+        </div>
+    }
+
     <div class="card border-0 shadow-sm bg-white">
 
         <div class="card-header bg-white border-bottom py-3">
@@ -118,9 +131,6 @@
                                     Güncellenme
                                 </th>
 
-                                <th class="px-4 py-3 text-end text-dark">
-                                    Excel
-                                </th>
                             </tr>
                         </thead>
 
@@ -183,14 +193,6 @@
                                         @displayedDate.ToString("dd.MM.yyyy HH:mm")
                                     </td>
 
-                                    <td class="px-4 text-end">
-                                        <a asp-controller="DepartmentManager"
-                                           asp-action="DownloadExcel"
-                                           asp-route-id="@item.Id"
-                                           class="btn btn-success btn-sm text-white">
-                                            Excel İndir
-                                        </a>
-                                    </td>
                                 </tr>
                             }
                         </tbody>

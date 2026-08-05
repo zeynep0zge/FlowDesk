@@ -4,6 +4,8 @@
     {
         public int WorkItemId { get; set; }
 
+        public int? DeveloperId { get; set; }
+
         public string? ManagerNote { get; set; }
     }
 }

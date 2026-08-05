@@ -13,8 +13,21 @@ public sealed class GeminiGenerateContentRequest
 
     [JsonPropertyName("generationConfig")]
     public required GeminiGenerationConfig GenerationConfig { get; init; }
+
+    [JsonPropertyName("tools")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<GeminiTool>? Tools { get; init; }
+}
+public sealed class GeminiTool
+{
+    [JsonPropertyName("googleSearch")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public GeminiGoogleSearch? GoogleSearch { get; init; }
 }
 
+public sealed class GeminiGoogleSearch
+{
+}
 public sealed class GeminiRequestContent
 {
     [JsonPropertyName("role")]
