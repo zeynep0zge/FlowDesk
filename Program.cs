@@ -191,6 +191,14 @@ var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
+    if (builder.Configuration.GetValue<bool>(
+        "Database:ApplyMigrationsOnStartup"))
+    {
+        await ApplyMigrationsWithRetryAsync(
+            scope.ServiceProvider,
+            app.Logger);
+    }
+
     await IdentitySeeder.SeedRolesAsync(
         scope.ServiceProvider);
 
@@ -262,6 +270,37 @@ if (app.Environment.IsDevelopment())
 }
 
 app.Run();
+
+static async Task ApplyMigrationsWithRetryAsync(
+    IServiceProvider serviceProvider,
+    ILogger logger)
+{
+    const int maximumAttempts = 10;
+    var database = serviceProvider.GetRequiredService<AppDbContext>();
+
+    for (int attempt = 1; attempt <= maximumAttempts; attempt++)
+    {
+        try
+        {
+            await database.Database.MigrateAsync();
+            return;
+        }
+        catch (Exception exception) when (attempt < maximumAttempts)
+        {
+            TimeSpan delay = TimeSpan.FromSeconds(
+                Math.Min(attempt * 2, 10));
+
+            logger.LogWarning(
+                exception,
+                "Database migration attempt {Attempt}/{MaximumAttempts} failed. Retrying in {DelaySeconds} seconds.",
+                attempt,
+                maximumAttempts,
+                delay.TotalSeconds);
+
+            await Task.Delay(delay);
+        }
+    }
+}
 
 static Func<HttpContext, RateLimitPartition<string>>
     CreateAccountRateLimitPartitioner(
