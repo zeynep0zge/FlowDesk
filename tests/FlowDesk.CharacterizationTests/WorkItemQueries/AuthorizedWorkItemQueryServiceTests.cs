@@ -118,7 +118,7 @@ public sealed class AuthorizedWorkItemQueryServiceTests
     }
 
     [Fact]
-    public async Task NormalManager_SeesOnlyAllowedStatusesInOwnDepartment()
+    public async Task DepartmentManager_SeesAllowedStatusesInAllDepartments()
     {
         WorkItem waiting = await CreateWorkItemAsync(
             WorkflowStatus.WaitingManagerApproval);
@@ -138,7 +138,7 @@ public sealed class AuthorizedWorkItemQueryServiceTests
         Assert.Contains(waiting.Id, ids);
         Assert.Contains(approved.Id, ids);
         Assert.DoesNotContain(wrongStatus.Id, ids);
-        Assert.DoesNotContain(otherDepartment.Id, ids);
+        Assert.Contains(otherDepartment.Id, ids);
     }
 
     [Fact]
@@ -161,7 +161,7 @@ public sealed class AuthorizedWorkItemQueryServiceTests
     }
 
     [Fact]
-    public async Task ProductionGlobalManager_FailsClosedDuringResolution()
+    public async Task ProductionDepartmentManager_ResolvesWithGlobalScope()
     {
         using var factory = new FlowDeskWebApplicationFactory(
             Environments.Production);
@@ -184,8 +184,9 @@ public sealed class AuthorizedWorkItemQueryServiceTests
             .GetRequiredService<IAuthenticatedActorContextResolver>()
             .ResolveAsync(CreatePrincipal(manager.Id));
 
-        Assert.True(result.IsForbidden);
-        Assert.Null(result.Data);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Data);
+        Assert.True(result.Data.CanAccessAllDepartments);
     }
 
     [Fact]

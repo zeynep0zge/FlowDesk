@@ -16,6 +16,7 @@ namespace FlowDesk.Data
         public DbSet<PasswordResetRequest> PasswordResetRequests { get; set; }
         public DbSet<EmailVerificationRequest> EmailVerificationRequests { get; set; }
         public DbSet<WorkItem> WorkItems { get; set; }
+        public DbSet<FeedbackMessage> FeedbackMessages { get; set; }
         public DbSet<WorkItemAiDraft> WorkItemAiDrafts { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -60,6 +61,29 @@ namespace FlowDesk.Data
                 .HasIndex(x => x.RequestNumber)
 
                 .IsUnique();
+
+            modelBuilder.Entity<FeedbackMessage>(entity =>
+            {
+                entity.Property(message => message.Message)
+                    .IsRequired()
+                    .HasMaxLength(2000);
+
+                entity.HasIndex(message => new
+                {
+                    message.WorkItemId,
+                    message.CreatedAt
+                });
+
+                entity.HasOne(message => message.WorkItem)
+                    .WithMany(workItem => workItem.FeedbackMessages)
+                    .HasForeignKey(message => message.WorkItemId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(message => message.SenderUser)
+                    .WithMany()
+                    .HasForeignKey(message => message.SenderUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
 
             modelBuilder.Entity<WorkItemAiDraft>(entity =>
             {

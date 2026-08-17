@@ -1,0 +1,57 @@
+services:
+  flowdesk-sql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?MSSQL_SA_PASSWORD must be set}
+    ports:
+      - "1433:1433"
+    volumes:
+      - flowdesk-sql-data:/var/opt/mssql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa
+          -P "$$MSSQL_SA_PASSWORD" -C -Q "SELECT 1" -b -o /dev/null
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  flowdesk-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: >-
+        Server=flowdesk-sql,1433;Database=FlowDeskDb;User Id=sa;
+        Password=${MSSQL_SA_PASSWORD:?MSSQL_SA_PASSWORD must be set};
+        Encrypt=True;TrustServerCertificate=True
+      Database__ApplyMigrationsOnStartup: "true"
+      ApprovedWorkItemExcel__FilePath: /app/App_Data/approved-work-items.xlsx
+      Gemini__ApiKey: ${GEMINI_API_KEY:?GEMINI_API_KEY must be set}
+      EmailSettings__Host: ${SMTP_HOST:?SMTP_HOST must be set}
+      EmailSettings__Port: ${SMTP_PORT:-587}
+      EmailSettings__SenderName: ${SMTP_SENDER_NAME:?SMTP_SENDER_NAME must be set}
+      EmailSettings__SenderEmail: ${SMTP_SENDER_EMAIL:?SMTP_SENDER_EMAIL must be set}
+      EmailSettings__Username: ${SMTP_USERNAME:?SMTP_USERNAME must be set}
+      EmailSettings__Password: ${SMTP_PASSWORD:?SMTP_PASSWORD must be set}
+    ports:
+      - "8080:8080"
+    volumes:
+      - flowdesk-app-data:/app/App_Data
+    depends_on:
+      flowdesk-sql:
+        condition: service_healthy
+
+volumes:
+  flowdesk-sql-data:
+  flowdesk-app-data:
+
+
+
+

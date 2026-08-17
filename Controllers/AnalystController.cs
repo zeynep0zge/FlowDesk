@@ -98,6 +98,39 @@ namespace FlowDesk.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SendReviewFeedback(
+            int id,
+            string? message)
+        {
+            var result = await _analystWorkflowService
+                .SendReviewFeedbackAsync(
+                    id,
+                    message,
+                    GetCurrentUserId());
+
+            if (result.IsNotFound)
+            {
+                return NotFound();
+            }
+
+            if (result.IsForbidden)
+            {
+                return Forbid();
+            }
+
+            TempData[result.IsSuccess
+                ? "SuccessMessage"
+                : "ErrorMessage"] = result.IsSuccess
+                ? "Mesaj gönderildi."
+                : result.ErrorMessage;
+
+            return result.IsSuccess
+                ? RedirectToAction(nameof(Inbox))
+                : RedirectToAction(nameof(Review), new { id });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> StartReview(int id)
         {
             var result =

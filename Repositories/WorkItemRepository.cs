@@ -53,9 +53,9 @@ namespace FlowDesk.Repositories
                 .AsNoTracking()
                 .Where(x =>
                     x.WorkflowStatus == WorkflowStatus.Submitted ||
-                    (x.WorkflowStatus ==
-                         WorkflowStatus.UnderAnalystReview &&
-                     x.AnalystId == currentAnalystId))
+                    (x.AnalystId == currentAnalystId &&
+                     x.WorkflowStatus !=
+                         WorkflowStatus.ReturnedToAnalyst))
                 .OrderByDescending(x => x.CreatedAt)
                 .ToListAsync();
         }
@@ -224,6 +224,48 @@ namespace FlowDesk.Repositories
             return await _context.WorkItems
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.Id == id);
+        }
+
+        public async Task<WorkItem?>
+            GetByIdWithFeedbackAsNoTrackingAsync(int id)
+        {
+            return await _context.WorkItems
+                .AsNoTracking()
+                .Include(x => x.FeedbackMessages
+                    .OrderBy(message => message.CreatedAt)
+                    .ThenBy(message => message.Id))
+                .ThenInclude(message => message.SenderUser)
+                .FirstOrDefaultAsync(x => x.Id == id);
+        }
+
+        public void AddFeedbackMessage(FeedbackMessage message)
+        {
+            _context.FeedbackMessages.Add(message);
+        }
+
+        public async Task MarkFeedbackMessagesReadAsync(
+            int workItemId,
+            int recipientUserId,
+            DateTime readAt)
+        {
+            List<FeedbackMessage> messages = await _context
+                .FeedbackMessages
+                .Where(message =>
+                    message.WorkItemId == workItemId &&
+                    message.SenderUserId != recipientUserId &&
+                    !message.IsRead)
+                .ToListAsync();
+
+            foreach (FeedbackMessage message in messages)
+            {
+                message.IsRead = true;
+                message.ReadAt = readAt;
+            }
+
+            if (messages.Count > 0)
+            {
+                await _context.SaveChangesAsync();
+            }
         }
 
         public void SetOriginalRowVersion(

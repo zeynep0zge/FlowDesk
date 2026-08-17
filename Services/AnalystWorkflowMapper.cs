@@ -40,7 +40,10 @@ public static class AnalystWorkflowMapper
             ExpectedStatus = workItem.ExpectedStatus,
             CurrentStatus = workItem.CurrentStatus,
             AnalystNote = workItem.AnalystNote,
-            ManagerNote = workItem.ManagerNote
+            ManagerNote = workItem.ManagerNote,
+            FeedbackMessages = workItem.FeedbackMessages
+                .OrderBy(message => message.CreatedAt)
+                .ToList()
         };
     }
 }

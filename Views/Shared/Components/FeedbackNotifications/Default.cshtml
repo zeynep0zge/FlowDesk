@@ -1,0 +1,38 @@
+@model FlowDesk.ViewModels.Shared.FeedbackNotificationViewModel
+
+@if (Model.UnreadCount > 0)
+{
+    <div class="dropdown">
+        <button class="btn btn-outline-primary dropdown-toggle"
+                type="button"
+                data-bs-toggle="dropdown"
+                aria-expanded="false">
+            Bildirimler
+            <span class="badge bg-danger">@Model.UnreadCount</span>
+        </button>
+
+        <ul class="dropdown-menu dropdown-menu-end">
+            @foreach (var item in Model.Items)
+            {
+                <li>
+                    <a class="dropdown-item"
+                       asp-controller="@Model.TargetController"
+                       asp-action="@Model.TargetAction"
+                       asp-route-id="@item.WorkItemId">
+
+                        <strong>@item.RequestNumber</strong>
+                        <br />
+
+                        <span>@item.Message</span>
+                        <br />
+
+                        <small class="text-muted">
+                            @item.SenderName -
+                            @item.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                        </small>
+                    </a>
+                </li>
+            }
+        </ul>
+    </div>
+}

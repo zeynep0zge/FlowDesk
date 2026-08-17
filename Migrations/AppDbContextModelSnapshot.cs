@@ -80,6 +80,43 @@ namespace FlowDesk.Migrations
                     b.ToTable("WorkItemAiDrafts", (string)null);
                 });
 
+            modelBuilder.Entity("FlowDesk.Models.FeedbackMessage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("SenderUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("WorkItemId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SenderUserId");
+
+                    b.HasIndex("WorkItemId", "CreatedAt");
+
+                    b.ToTable("FeedbackMessages");
+                });
+
             modelBuilder.Entity("FlowDesk.Models.ApplicationUser", b =>
                 {
                     b.Property<int>("Id")
@@ -214,6 +251,25 @@ namespace FlowDesk.Migrations
                     b.ToTable("EmailVerificationRequests");
                 });
 
+            modelBuilder.Entity("FlowDesk.Models.FeedbackMessage", b =>
+                {
+                    b.HasOne("FlowDesk.Models.ApplicationUser", "SenderUser")
+                        .WithMany()
+                        .HasForeignKey("SenderUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FlowDesk.Models.WorkItem", "WorkItem")
+                        .WithMany("FeedbackMessages")
+                        .HasForeignKey("WorkItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SenderUser");
+
+                    b.Navigation("WorkItem");
+                });
+
             modelBuilder.Entity("FlowDesk.Models.PasswordResetRequest", b =>
                 {
                     b.Property<int>("Id")
@@ -269,6 +325,16 @@ namespace FlowDesk.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<int?>("AnalystId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("AnalystFeedbackAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("AnalystFeedbackDescription")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int?>("AnalystFeedbackStatus")
                         .HasColumnType("int");
 
                     b.Property<string>("AnalystNote")
@@ -516,6 +582,11 @@ namespace FlowDesk.Migrations
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("FlowDesk.Models.WorkItem", b =>
+                {
+                    b.Navigation("FeedbackMessages");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<int>", b =>

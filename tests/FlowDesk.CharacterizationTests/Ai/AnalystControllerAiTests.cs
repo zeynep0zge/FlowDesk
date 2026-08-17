@@ -411,5 +411,13 @@ public sealed class AnalystControllerAiTests
         {
             throw new NotSupportedException();
         }
+
+        public Task<ServiceResult> SendReviewFeedbackAsync(
+            int workItemId,
+            string? message,
+            int? currentAnalystId)
+        {
+            throw new NotSupportedException();
+        }
     }
 }

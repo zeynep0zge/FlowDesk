@@ -12,6 +12,7 @@
         WorkflowStatus.InProgress => "badge-status-progress",
         WorkflowStatus.Completed => "badge-status-completed",
         WorkflowStatus.Rejected => "badge-status-rejected",
+        WorkflowStatus.ReturnedToBusinessUnit => "badge-status-returned",
         _ => "badge-status-neutral"
     };
     string description = WorkflowStatusDescriptions.GetDescription(Model);

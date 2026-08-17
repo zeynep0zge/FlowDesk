@@ -1,3 +1,4 @@
+@using FlowDesk.Constants
 @model FlowDesk.Models.WorkItem
 
 @{
@@ -24,6 +25,7 @@
             FlowDesk.Models.WorkflowStatus.InProgress => "badge-status-review",
             FlowDesk.Models.WorkflowStatus.Completed => "badge-status-completed",
             FlowDesk.Models.WorkflowStatus.Rejected => "badge-status-rejected",
+            FlowDesk.Models.WorkflowStatus.ReturnedToBusinessUnit => "badge-status-returned",
             _ => "bg-secondary text-white"
         };
     }
@@ -70,6 +72,15 @@
             Taleplerime Geri Dön
         </a>
     </header>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success" role="status">@TempData["SuccessMessage"]</div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger" role="alert">@TempData["ErrorMessage"]</div>
+    }
 
     <!-- Details View Layout -->
     <div class="row g-4">
@@ -150,6 +161,54 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div class="modern-card mb-4">
+                <div class="modern-card-header">
+                    <h5 class="modern-card-title">Analist Mesajları</h5>
+                </div>
+                <div class="p-4">
+                    @if (Model.FeedbackMessages.Count == 0)
+                    {
+                        <p class="text-muted">Henüz mesaj yok.</p>
+                    }
+                    else
+                    {
+                        @foreach (var feedback in Model.FeedbackMessages)
+                        {
+                            string sender = feedback.SenderUserId == Model.AnalystId
+                                ? "Analist"
+                                : "İş Birimi";
+                            <div class="border rounded p-3 mb-3">
+                                <div class="d-flex justify-content-between gap-3 mb-2">
+                                    <strong>@sender — @feedback.SenderUser.FullName</strong>
+                                    <span class="text-muted text-nowrap">
+                                        @feedback.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                                    </span>
+                                </div>
+                                <div style="white-space: pre-wrap;">@feedback.Message</div>
+                            </div>
+                        }
+                    }
+
+                    @if (Model.AnalystId.HasValue)
+                    {
+                        <form asp-controller="ProjectManager"
+                              asp-action="SendFeedbackMessage"
+                              asp-route-id="@Model.Id"
+                              method="post">
+                            @Html.AntiForgeryToken()
+                            <label for="feedbackMessage" class="form-label">Analiste cevap</label>
+                            <textarea id="feedbackMessage"
+                                      name="message"
+                                      class="form-control"
+                                      rows="4"
+                                      maxlength="2000"
+                                      required></textarea>
+                            <button type="submit" class="btn btn-primary mt-3">Mesaj Gönder</button>
+                        </form>
+                    }
                 </div>
             </div>
         </div>

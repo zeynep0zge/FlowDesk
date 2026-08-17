@@ -13,7 +13,8 @@ namespace FlowDesk.Models
         Assigned = 6,               // Görev yazılımcıya atandı
         InProgress = 7,             // Görev üzerinde çalışılıyor
         Completed = 8,              // Görev tamamlandı
-        Rejected = 9                // Görev reddedildi
+        Rejected = 9,               // Görev reddedildi
+        ReturnedToBusinessUnit = 10 // Analist İş Birimine iade etti
     }
 
     public enum RequestPriority
@@ -89,6 +90,19 @@ namespace FlowDesk.Models
         [StringLength(1000)]
         [Display(Name = "Analist Notu")]
         public string? AnalystNote { get; set; }
+
+        [Display(Name = "Son Analist Geri Bildirimi")]
+        public WorkflowStatus? AnalystFeedbackStatus { get; set; }
+
+        [StringLength(500)]
+        [Display(Name = "Analist Geri Bildirim Açıklaması")]
+        public string? AnalystFeedbackDescription { get; set; }
+
+        [Display(Name = "Analist Geri Bildirim Tarihi")]
+        public DateTime? AnalystFeedbackAt { get; set; }
+
+        public ICollection<FeedbackMessage> FeedbackMessages { get; set; }
+            = new List<FeedbackMessage>();
 
         // Departman yöneticisinin belirleyeceği alanlar
 
