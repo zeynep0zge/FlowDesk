@@ -90,7 +90,7 @@ public class AnalystWorkflowService : IAnalystWorkflowService
         }
 
         WorkItem? workItem = await _workItemRepository
-            .GetByIdAsNoTrackingAsync(id);
+            .GetByIdWithFeedbackAsNoTrackingAsync(id);
         if (workItem == null)
         {
             return ServiceResult<AnalystReviewViewModel>.NotFound(
@@ -109,6 +109,21 @@ public class AnalystWorkflowService : IAnalystWorkflowService
             return ServiceResult<AnalystReviewViewModel>.Failure(
                 "Bu talep analist tarafından düzenlenebilecek aşamada " +
                 "değildir.");
+        }
+
+        DateTime readAt = DateTime.UtcNow;
+        await _workItemRepository.MarkFeedbackMessagesReadAsync(
+            workItem.Id,
+            currentAnalystId.GetValueOrDefault(),
+            readAt);
+        foreach (FeedbackMessage message in workItem.FeedbackMessages.Where(
+                     message =>
+                         message.SenderUserId !=
+                             currentAnalystId.GetValueOrDefault() &&
+                         !message.IsRead))
+        {
+            message.IsRead = true;
+            message.ReadAt = readAt;
         }
 
         return ServiceResult<AnalystReviewViewModel>.Success(
@@ -315,6 +330,147 @@ public class AnalystWorkflowService : IAnalystWorkflowService
         return ServiceResult.Success();
     }
 
+    public async Task<ServiceResult<WorkItem>> GetFeedbackAsync(
+        int id,
+        int? currentAnalystId)
+    {
+        if (!IsValidUserId(currentAnalystId))
+        {
+            return ServiceResult<WorkItem>.Forbidden(
+                InvalidActorMessage);
+        }
+
+        string? idError = _validator.ValidateWorkItemId(id);
+        if (idError != null)
+        {
+            return ServiceResult<WorkItem>.Failure(idError);
+        }
+
+        WorkItem? workItem = await _workItemRepository
+            .GetByIdAsNoTrackingAsync(id);
+        if (workItem == null)
+        {
+            return ServiceResult<WorkItem>.NotFound(NotFoundMessage);
+        }
+
+        if (workItem.AnalystId != currentAnalystId.GetValueOrDefault())
+        {
+            return ServiceResult<WorkItem>.Forbidden(
+                "Bu talebe geri bildirim gönderme yetkiniz bulunmuyor.");
+        }
+
+        return ServiceResult<WorkItem>.Success(workItem);
+    }
+
+    public async Task<ServiceResult> SendFeedbackAsync(
+        SendAnalystFeedbackDto dto,
+        int? currentAnalystId)
+    {
+        if (!IsValidUserId(currentAnalystId))
+        {
+            return ServiceResult.Forbidden(InvalidActorMessage);
+        }
+
+        string? idError = _validator.ValidateWorkItemId(dto.WorkItemId);
+        if (idError != null)
+        {
+            return ServiceResult.Failure(idError);
+        }
+
+        WorkItem? workItem = await _workItemRepository
+            .GetByIdAsync(dto.WorkItemId);
+        if (workItem == null)
+        {
+            return ServiceResult.NotFound(NotFoundMessage);
+        }
+
+        if (workItem.AnalystId != currentAnalystId.GetValueOrDefault())
+        {
+            return ServiceResult.Forbidden(
+                "Bu talebe geri bildirim gönderme yetkiniz bulunmuyor.");
+        }
+
+        if (!dto.FeedbackStatus.HasValue ||
+            !AnalystFeedbackStatusOptions.Contains(
+                dto.FeedbackStatus.Value))
+        {
+            return ServiceResult.Failure(
+                "Geçerli bir geri bildirim durumu seçiniz.");
+        }
+
+        string? description = string.IsNullOrWhiteSpace(dto.Description)
+            ? null
+            : dto.Description.Trim();
+        if (description == null)
+        {
+            return ServiceResult.Failure(
+                "Geri bildirim açıklaması zorunludur.");
+        }
+
+        if (description.Length > 500)
+        {
+            return ServiceResult.Failure(
+                "Geri bildirim açıklaması en fazla 500 karakter olabilir.");
+        }
+
+        DateTime now = DateTime.UtcNow;
+        workItem.AnalystFeedbackStatus = dto.FeedbackStatus.Value;
+        workItem.AnalystFeedbackDescription = description;
+        workItem.AnalystFeedbackAt = now;
+        workItem.UpdatedAt = now;
+        await _workItemRepository.SaveChangesAsync();
+        return ServiceResult.Success();
+    }
+
+    public async Task<ServiceResult> SendReviewFeedbackAsync(
+        int workItemId,
+        string? message,
+        int? currentAnalystId)
+    {
+        if (!IsValidUserId(currentAnalystId))
+        {
+            return ServiceResult.Forbidden(InvalidActorMessage);
+        }
+
+        string? normalizedMessage = NormalizeFeedbackMessage(message);
+        if (normalizedMessage == null)
+        {
+            return ServiceResult.Failure("Mesaj zorunludur.");
+        }
+
+        WorkItem? workItem = await _workItemRepository
+            .GetByIdAsync(workItemId);
+        if (workItem == null)
+        {
+            return ServiceResult.NotFound(NotFoundMessage);
+        }
+
+        int analystId = currentAnalystId.GetValueOrDefault();
+        if (workItem.AnalystId != analystId)
+        {
+            return ServiceResult.Forbidden(
+                "Bu talebe mesaj gönderme yetkiniz bulunmuyor.");
+        }
+
+        if (!WorkflowStatusPolicy.CanAnalystSaveAnalysis(
+                workItem.WorkflowStatus))
+        {
+            return ServiceResult.Failure(
+                "Bu talep inceleme aşamasında değildir.");
+        }
+
+        _workItemRepository.AddFeedbackMessage(new FeedbackMessage
+        {
+            WorkItemId = workItem.Id,
+            SenderUserId = analystId,
+            Message = normalizedMessage,
+            CreatedAt = DateTime.UtcNow
+        });
+        await _workItemRepository.SaveChangesAsync();
+
+        return ServiceResult.Success();
+    }
+
     private async Task<ServiceResult> ValidateDeveloperAsync(
         int? developerId,
         string workItemDepartment)
@@ -432,5 +588,14 @@ public class AnalystWorkflowService : IAnalystWorkflowService
     private static bool IsValidUserId(int? userId)
     {
         return userId.HasValue && userId.Value > 0;
+    }
+
+    private static string? NormalizeFeedbackMessage(string? message)
+    {
+        string? normalized = string.IsNullOrWhiteSpace(message)
+            ? null
+            : message.Trim();
+
+        return normalized?.Length <= 2000 ? normalized : null;
     }
 }

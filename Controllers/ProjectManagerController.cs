@@ -111,6 +111,39 @@ namespace FlowDesk.Controllers
             return View(result.Data);
         }
 
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SendFeedbackMessage(
+            int id,
+            string? message)
+        {
+            ServiceResult result = await _workItemService
+                .SendFeedbackMessageAsync(
+                    id,
+                    message,
+                    GetCurrentUserId());
+
+            if (result.IsNotFound)
+            {
+                return NotFound();
+            }
+
+            if (result.IsForbidden)
+            {
+                return Forbid();
+            }
+
+            TempData[result.IsSuccess
+                ? "SuccessMessage"
+                : "ErrorMessage"] = result.IsSuccess
+                ? "Mesaj gönderildi."
+                : result.ErrorMessage;
+
+            return result.IsSuccess
+                ? RedirectToAction("Index", "ProjectManager")
+                : RedirectToAction(nameof(Details), new { id });
+        }
+
         // Talebi güncelleme sayfasını açar.
         [HttpGet]
         public async Task<IActionResult> Edit(int id)

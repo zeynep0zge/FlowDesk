@@ -13,14 +13,11 @@ public sealed class ManagerAccessScopeResolver
         "Departman yöneticisi kapsamı geçersiz.";
 
     private readonly UserManager<ApplicationUser> _userManager;
-    private readonly IHostEnvironment _hostEnvironment;
 
     public ManagerAccessScopeResolver(
-        UserManager<ApplicationUser> userManager,
-        IHostEnvironment hostEnvironment)
+        UserManager<ApplicationUser> userManager)
     {
         _userManager = userManager;
-        _hostEnvironment = hostEnvironment;
     }
 
     public async Task<ServiceResult<ManagerAccessScope>> ResolveAsync(
@@ -44,30 +41,9 @@ public sealed class ManagerAccessScopeResolver
                 InvalidScopeMessage);
         }
 
-        string? department = manager.Department?.Trim();
-        bool requestsGlobalScope = string.Equals(
-            department,
-            DepartmentOptions.AllDepartments,
-            StringComparison.Ordinal);
-
-        if (requestsGlobalScope)
-        {
-            return _hostEnvironment.IsDevelopment()
-                ? ServiceResult<ManagerAccessScope>.Success(
-                    new ManagerAccessScope(
-                        DepartmentOptions.AllDepartments,
-                        true))
-                : ServiceResult<ManagerAccessScope>.Forbidden(
-                    InvalidScopeMessage);
-        }
-
-        if (!DepartmentOptions.Contains(department))
-        {
-            return ServiceResult<ManagerAccessScope>.Forbidden(
-                InvalidScopeMessage);
-        }
-
         return ServiceResult<ManagerAccessScope>.Success(
-            new ManagerAccessScope(department!, false));
+            new ManagerAccessScope(
+                DepartmentOptions.AllDepartments,
+                true));
     }
 }

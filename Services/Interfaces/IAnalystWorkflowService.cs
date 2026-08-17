@@ -29,5 +29,23 @@ namespace FlowDesk.Services.Interfaces
             SubmitForApprovalAsync(
                 SubmitForApprovalDto dto,
                 int? currentAnalystId);
+
+        Task<ServiceResult> SendReviewFeedbackAsync(
+            int workItemId,
+            string? message,
+            int? currentAnalystId);
+
+        Task<ServiceResult<FlowDesk.Models.WorkItem>>
+            GetFeedbackAsync(int id, int? currentAnalystId)
+        {
+            throw new NotSupportedException();
+        }
+
+        Task<ServiceResult> SendFeedbackAsync(
+            SendAnalystFeedbackDto dto,
+            int? currentAnalystId)
+        {
+            throw new NotSupportedException();
+        }
     }
 }

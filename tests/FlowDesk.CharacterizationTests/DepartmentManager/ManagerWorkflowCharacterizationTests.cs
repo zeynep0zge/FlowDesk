@@ -91,7 +91,7 @@ public sealed class ManagerWorkflowCharacterizationTests
     }
 
     [Fact]
-    public async Task GetSharedExcel_ReturnsScopedApprovedProjectionFromDatabase()
+    public async Task GetSharedExcel_ReturnsGlobalApprovedProjectionFromDatabase()
     {
         await WithServicesAsync(async services =>
         {
@@ -139,13 +139,13 @@ public sealed class ManagerWorkflowCharacterizationTests
             var result = await service.GetSharedExcelAsync(9001);
 
             Assert.True(result.IsSuccess);
-            Assert.Equal(2, result.Data!.Requests.Count);
-            Assert.Equal(
-                newer.RequestNumber,
-                result.Data.Requests[0].RequestNumber);
+            Assert.Equal(3, result.Data!.Requests.Count);
+            var newerProjected = Assert.Single(
+                result.Data.Requests,
+                item => item.RequestNumber == newer.RequestNumber);
             Assert.Equal(
                 newer.RequestDescription,
-                result.Data.Requests[0].RequestDescription);
+                newerProjected.RequestDescription);
             var projected = Assert.Single(
                 result.Data.Requests,
                 item => item.RequestNumber == older.RequestNumber);
@@ -160,7 +160,7 @@ public sealed class ManagerWorkflowCharacterizationTests
             Assert.Equal(older.CurrentStatus, projected.CurrentStatus);
             Assert.Equal(older.RequestDescription,
                 projected.RequestDescription);
-            Assert.DoesNotContain(
+            Assert.Contains(
                 result.Data.Requests,
                 item => item.RequestNumber == hiddenDepartment.RequestNumber);
         });

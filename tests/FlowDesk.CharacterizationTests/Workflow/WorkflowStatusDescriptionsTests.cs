@@ -24,6 +24,7 @@ public sealed class WorkflowStatusDescriptionsTests
     [InlineData(WorkflowStatus.InProgress, "Geliştiriliyor")]
     [InlineData(WorkflowStatus.Completed, "Tamamlandı")]
     [InlineData(WorkflowStatus.Rejected, "Reddedildi")]
+    [InlineData(WorkflowStatus.ReturnedToBusinessUnit, "İade Edildi")]
     public void GetDescription_ReturnsCentralizedDisplayText(
         WorkflowStatus status,
         string expected)

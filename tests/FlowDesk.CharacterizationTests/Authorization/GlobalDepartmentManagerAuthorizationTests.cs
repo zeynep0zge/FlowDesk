@@ -31,7 +31,7 @@ public sealed class GlobalDepartmentManagerAuthorizationTests
     }
 
     [Fact]
-    public async Task NormalManager_InboxListsOnlyOwnDepartmentRequests()
+    public async Task DepartmentManager_InboxListsAllDepartmentRequests()
     {
         WorkItem own = await CreateWorkItemAsync(
             WorkflowStatus.WaitingManagerApproval,
@@ -45,7 +45,7 @@ public sealed class GlobalDepartmentManagerAuthorizationTests
             "/DepartmentManager/Inbox")).Content.ReadAsStringAsync();
 
         Assert.Contains(own.RequestNumber, body, StringComparison.Ordinal);
-        Assert.DoesNotContain(
+        Assert.Contains(
             other.RequestNumber,
             body,
             StringComparison.Ordinal);

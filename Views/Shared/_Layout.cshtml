@@ -135,6 +135,20 @@
                 <div class="header-user-area">
                     @if (isAuthenticated)
                     {
+                        @if (currentUser != null &&
+                             (User.IsInRole(AppRoles.ProjectManager) ||
+                              User.IsInRole(AppRoles.Analyst)))
+                        {
+                            @await Component.InvokeAsync(
+                                "FeedbackNotifications",
+                                new
+                                {
+                                    userId = currentUser.Id,
+                                    isAnalyst = User.IsInRole(
+                                        AppRoles.Analyst)
+                                })
+                        }
+
                         <div class="user-badge">
                             <div class="user-avatar" aria-hidden="true">
                                 @userInitial

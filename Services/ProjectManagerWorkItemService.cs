@@ -49,8 +49,75 @@ public sealed class ProjectManagerWorkItemService
         int? currentUserId)
     {
         WorkItem? workItem =
-            await _workItemRepository.GetByIdAsNoTrackingAsync(id);
-        return AuthorizeRead(workItem, currentUserId);
+            await _workItemRepository
+                .GetByIdWithFeedbackAsNoTrackingAsync(id);
+        ServiceResult<WorkItem> access =
+            AuthorizeRead(workItem, currentUserId);
+        if (!access.IsSuccess)
+        {
+            return access;
+        }
+
+        DateTime readAt = DateTime.UtcNow;
+        int recipientUserId = currentUserId.GetValueOrDefault();
+        await _workItemRepository.MarkFeedbackMessagesReadAsync(
+            id,
+            recipientUserId,
+            readAt);
+        foreach (FeedbackMessage message in workItem!.FeedbackMessages.Where(
+                     message =>
+                         message.SenderUserId != recipientUserId &&
+                         !message.IsRead))
+        {
+            message.IsRead = true;
+            message.ReadAt = readAt;
+        }
+
+        return access;
+    }
+
+    public async Task<ServiceResult> SendFeedbackMessageAsync(
+        int workItemId,
+        string? message,
+        int? currentUserId)
+    {
+        WorkItem? workItem = await _workItemRepository
+            .GetByIdAsync(workItemId);
+        if (workItem == null)
+        {
+            return ServiceResult.NotFound(NotFoundMessage);
+        }
+
+        if (IsForbidden(workItem, currentUserId))
+        {
+            return ServiceResult.Forbidden(ForbiddenMessage);
+        }
+
+        string? normalizedMessage = string.IsNullOrWhiteSpace(message)
+            ? null
+            : message.Trim();
+        if (normalizedMessage == null || normalizedMessage.Length > 2000)
+        {
+            return ServiceResult.Failure(
+                "Mesaj zorunludur ve en fazla 2000 karakter olabilir.");
+        }
+
+        if (!workItem.AnalystId.HasValue)
+        {
+            return ServiceResult.Failure(
+                "Talebe henüz analist atanmamış.");
+        }
+
+        _workItemRepository.AddFeedbackMessage(new FeedbackMessage
+        {
+            WorkItemId = workItem.Id,
+            SenderUserId = currentUserId!.Value,
+            Message = normalizedMessage,
+            CreatedAt = DateTime.UtcNow
+        });
+        await _workItemRepository.SaveChangesAsync();
+
+        return ServiceResult.Success();
     }
 
     public async Task<ServiceResult> CreateAsync(

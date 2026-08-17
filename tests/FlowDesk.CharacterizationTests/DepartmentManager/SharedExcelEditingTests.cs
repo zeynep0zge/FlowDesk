@@ -41,26 +41,36 @@ public sealed class SharedExcelEditingTests : DatabaseTestBase
     }
 
     [Fact]
-    public async Task EditApprovedWorkItem_DifferentDepartment_IsNotFound()
+    public async Task EditApprovedWorkItem_DifferentDepartment_IsUpdated()
     {
         await WithServicesAsync(async services =>
         {
             string otherDepartment = DepartmentOptions.All.First(
                 department => department != TestDataSeeder.DefaultDepartment);
+            ApplicationUser developer =
+                await TestDataSeeder.CreateUserAsync(
+                    services,
+                    TestDataSeeder.UniqueEmail("other-department-developer"),
+                    assignedRole: AppRoles.Employee,
+                    department: otherDepartment,
+                    businessCode: "ENG-OTHER-000001");
             WorkItem workItem = await CreateEditableWorkItemAsync(
                 services,
                 otherDepartment);
-            string originalRequest = workItem.RequestDescription;
             IDepartmentManagerWorkflowService service = services
                 .GetRequiredService<IDepartmentManagerWorkflowService>();
 
+            EditApprovedWorkItemDto dto = CreateValidDto(workItem.Id);
+            dto.DeveloperId = developer.Id;
+
             ServiceResult result = await service.EditApprovedWorkItemAsync(
-                CreateValidDto(workItem.Id),
+                dto,
                 9001);
 
-            Assert.True(result.IsNotFound);
-            Assert.Equal(originalRequest, workItem.RequestDescription);
-            Assert.Equal(0, Factory.ApprovedExcel.CallCount);
+            Assert.True(result.IsSuccess);
+            Assert.Equal("Güncellenmiş talep metni",
+                workItem.RequestDescription);
+            Assert.Equal(1, Factory.ApprovedExcel.CallCount);
         });
     }
 

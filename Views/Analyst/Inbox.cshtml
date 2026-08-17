@@ -142,13 +142,13 @@
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <h5 class="fw-bold mb-1">
-                        İncelenecek Talepler
+                        Analist Talepleri
                     </h5>
 
                     <p class="text-muted mb-0"
                        style="font-size: 0.85rem;">
-                        Talebi açarak analiz ve atama bilgilerini
-                        düzenleyebilirsiniz.
+                        Atanan talepleri inceleyebilir ve İş Birimine
+                        durum geri bildirimi gönderebilirsiniz.
                     </p>
                 </div>
 
@@ -277,7 +277,20 @@
 
                                     <td><partial name="_PriorityBadge" model="item.Priority" /></td>
 
-                                    <td><partial name="_WorkflowStatusBadge" model="item.WorkflowStatus" /></td>
+                                    <td>
+                                        @if (item.WorkflowStatus ==
+                                            WorkflowStatus.ReturnedToBusinessUnit)
+                                        {
+                                            <span class="badge-pill-custom badge-status-returned">
+                                                <span class="badge-dot" aria-hidden="true"></span>
+                                                İade Edildi
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <partial name="_WorkflowStatusBadge" model="item.WorkflowStatus" />
+                                        }
+                                    </td>
 
                                     <td>
                                         @if (string.IsNullOrWhiteSpace(item.CurrentStatus))
@@ -297,7 +310,12 @@
                                     </td>
 
                                     <td class="text-center pe-4 align-middle inbox-action-cell">
-                                        @if (item.WorkflowStatus == WorkflowStatus.Submitted)
+                                        @if (item.WorkflowStatus ==
+                                            WorkflowStatus.ReturnedToBusinessUnit)
+                                        {
+                                            <span class="text-muted">İşlem yok</span>
+                                        }
+                                        else if (item.WorkflowStatus == WorkflowStatus.Submitted)
                                         {
                                             <form asp-controller="Analyst"
                                                   asp-action="StartReview"
@@ -312,7 +330,9 @@
                                                 </button>
                                             </form>
                                         }
-                                        else
+                                        else if (WorkflowStatusPolicy
+                                            .CanAnalystSaveAnalysis(
+                                                item.WorkflowStatus))
                                         {
                                             <a asp-controller="Analyst"
                                                asp-action="Review"
@@ -320,6 +340,10 @@
                                                class="btn btn-sm btn-primary review-action-btn">
                                                 İncelemeye Devam Et
                                             </a>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">İşlem yok</span>
                                         }
                                     </td>
                                 </tr>

@@ -32,5 +32,10 @@ namespace FlowDesk.Services.Interfaces
         Task<ServiceResult> DeleteAsync(
             int id,
             int? currentUserId);
+
+        Task<ServiceResult> SendFeedbackMessageAsync(
+            int workItemId,
+            string? message,
+            int? currentUserId);
     }
 }

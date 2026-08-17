@@ -44,6 +44,8 @@ namespace FlowDesk.ViewModels.Analyst
         // Departman yöneticisi talebi iade ettiğinde gösterilecek not.
         public string? ManagerNote { get; set; }
 
+        public List<FeedbackMessage> FeedbackMessages { get; set; } = [];
+
         // Mevcut statü seçim kutusunda gösterilecek seçenekler.
         public List<string> CurrentStatusOptions { get; set; } =
             [.. AnalystCurrentStatusOptions.All];

@@ -62,6 +62,16 @@ namespace FlowDesk.Repositories.Interfaces
         Task<WorkItem?>
             GetByIdAsNoTrackingAsync(int id);
 
+        Task<WorkItem?>
+            GetByIdWithFeedbackAsNoTrackingAsync(int id);
+
+        void AddFeedbackMessage(FeedbackMessage message);
+
+        Task MarkFeedbackMessagesReadAsync(
+            int workItemId,
+            int recipientUserId,
+            DateTime readAt);
+
         void SetOriginalRowVersion(
             WorkItem workItem,
             byte[] rowVersion);

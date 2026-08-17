@@ -10,7 +10,7 @@ namespace FlowDesk.CharacterizationTests.Authorization;
 public sealed class ManagerScopeEnvironmentTests
 {
     [Fact]
-    public async Task Production_AllDepartmentsScope_FailsClosedForBothDomains()
+    public async Task Production_DepartmentManager_HasGlobalScopeForBothDomains()
     {
         using var factory = new FlowDeskWebApplicationFactory(
             Environments.Production);
@@ -45,8 +45,8 @@ public sealed class ManagerScopeEnvironmentTests
         HttpResponseMessage pendingUsers = await globalClient.GetAsync(
             "/DepartmentManager/PendingUsers");
 
-        Assert.Equal(HttpStatusCode.Forbidden, inbox.StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, pendingUsers.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, inbox.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, pendingUsers.StatusCode);
 
         using HttpClient normalClient = factory.CreateClient(
                 new WebApplicationFactoryClientOptions

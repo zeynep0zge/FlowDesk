@@ -24,6 +24,8 @@ public static class WorkflowStatusDescriptions
                 "Tamamlandı",
             WorkflowStatus.Rejected =>
                 "Reddedildi",
+            WorkflowStatus.ReturnedToBusinessUnit =>
+                "İade Edildi",
             _ => status.ToString()
         };
     }

@@ -17,7 +17,7 @@ public sealed class DepartmentManagerAuthorizationTests
         .First(x => x != TestDataSeeder.DefaultDepartment);
 
     [Fact]
-    public async Task PendingUsers_DifferentDepartmentUser_IsNotListed()
+    public async Task PendingUsers_DifferentDepartmentUser_IsListed()
     {
         string email = TestDataSeeder.UniqueEmail("cross-department");
         await WithServicesAsync(services => TestDataSeeder.CreateUserAsync(
@@ -34,11 +34,11 @@ public sealed class DepartmentManagerAuthorizationTests
         string body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.DoesNotContain(email, body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(email, body, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public async Task ApproveUser_DifferentDepartmentUser_IsForbidden()
+    public async Task ApproveUser_DifferentDepartmentUser_IsApproved()
     {
         ApplicationUser target = await WithServicesAsync(services =>
             TestDataSeeder.CreateUserAsync(
@@ -57,16 +57,16 @@ public sealed class DepartmentManagerAuthorizationTests
                 $"/DepartmentManager/ApproveUser/{target.Id}",
                 new Dictionary<string, string>());
 
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         bool isApproved = await WithServicesAsync(async services =>
             (await services.GetRequiredService<AppDbContext>()
                 .Users.AsNoTracking()
                 .SingleAsync(x => x.Id == target.Id)).IsApproved);
-        Assert.False(isApproved);
+        Assert.True(isApproved);
     }
 
     [Fact]
-    public async Task Review_DifferentDepartmentWorkItem_IsNotFound()
+    public async Task Review_DifferentDepartmentWorkItem_IsAccessible()
     {
         WorkItem target = await CreateWorkItemAsync(
             WorkflowStatus.WaitingManagerApproval,
@@ -76,12 +76,19 @@ public sealed class DepartmentManagerAuthorizationTests
         HttpResponseMessage response = await client.GetAsync(
             $"/DepartmentManager/Review/{target.Id}");
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]
-    public async Task Approve_DifferentDepartmentWorkItem_DoesNotChangeIt()
+    public async Task Approve_DifferentDepartmentWorkItem_ApprovesIt()
     {
+        ApplicationUser developer = await WithServicesAsync(services =>
+            TestDataSeeder.CreateUserAsync(
+                services,
+                TestDataSeeder.UniqueEmail("cross-department-developer"),
+                assignedRole: AppRoles.Employee,
+                department: OtherDepartment,
+                businessCode: "ENG-CROSS-000001"));
         WorkItem target = await CreateWorkItemAsync(
             WorkflowStatus.WaitingManagerApproval,
             OtherDepartment);
@@ -94,16 +101,19 @@ public sealed class DepartmentManagerAuthorizationTests
             await client.PostFormWithAntiforgeryAsync(
                 $"/DepartmentManager/Review/{own.Id}",
                 $"/DepartmentManager/Approve/{target.Id}",
-                new Dictionary<string, string>());
+                new Dictionary<string, string>
+                {
+                    ["DeveloperId"] = developer.Id.ToString()
+                });
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.Equal(
-            WorkflowStatus.WaitingManagerApproval,
+            WorkflowStatus.Approved,
             await GetWorkflowStatusAsync(target.Id));
     }
 
     [Fact]
-    public async Task Return_DifferentDepartmentWorkItem_DoesNotChangeIt()
+    public async Task Return_DifferentDepartmentWorkItem_ReturnsIt()
     {
         WorkItem target = await CreateWorkItemAsync(
             WorkflowStatus.WaitingManagerApproval,
@@ -122,9 +132,9 @@ public sealed class DepartmentManagerAuthorizationTests
                     ["ManagerNote"] = "Cross-department attempt"
                 });
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.Equal(
-            WorkflowStatus.WaitingManagerApproval,
+            WorkflowStatus.ReturnedToAnalyst,
             await GetWorkflowStatusAsync(target.Id));
     }
 
@@ -217,7 +227,7 @@ public sealed class DepartmentManagerAuthorizationTests
     }
 
     [Fact]
-    public async Task InvalidManagerDepartment_AccountAndWorkflowFailClosed()
+    public async Task DepartmentManager_DepartmentValue_DoesNotRestrictGlobalScope()
     {
         const int managerId = 7000;
         await WithServicesAsync(services => TestDataSeeder.CreateUserAsync(
@@ -238,8 +248,8 @@ public sealed class DepartmentManagerAuthorizationTests
             return (account, workflow);
         });
 
-        Assert.True(results.account.IsForbidden);
-        Assert.True(results.workflow.IsForbidden);
+        Assert.True(results.account.IsSuccess);
+        Assert.True(results.workflow.IsSuccess);
     }
 
     private HttpClient ManagerClient()
